@@ -1420,6 +1420,38 @@ LONG __stdcall MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionInfo) {
   CreateMiniDump(pExceptionInfo);
   return EXCEPTION_EXECUTE_HANDLER;
 }
+
+BOOL ExtractResource(DWORD resourceId, LPCWSTR outputFilename) {
+  HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(resourceId), L"TEXT");
+  if (!hResource)
+    return FALSE;
+
+  HGLOBAL hLoadedResource = LoadResource(NULL, hResource);
+  if (!hLoadedResource)
+    return FALSE;
+
+  LPVOID pResourceData = LockResource(hLoadedResource);
+  if (!pResourceData)
+    return FALSE;
+
+  DWORD resourceSize = SizeofResource(NULL, hResource);
+  if (resourceSize == 0)
+    return FALSE;
+
+  HANDLE hFile =
+      CreateFile(outputFilename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                 FILE_ATTRIBUTE_NORMAL, NULL);
+  if (hFile == INVALID_HANDLE_VALUE)
+    return FALSE;
+
+  DWORD bytesWritten;
+  BOOL result =
+      WriteFile(hFile, pResourceData, resourceSize, &bytesWritten, NULL);
+  CloseHandle(hFile);
+
+  return result;
+}
+
 int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                    int nWinMode) {
   HANDLE hMutex =
@@ -1450,11 +1482,27 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   }
   wcscat_s(iniFile, MAX_PATH, L".ini");
 
+  if (GetFileAttributes(iniFile) == INVALID_FILE_ATTRIBUTES) {
+    ExtractResource(IDR_INI_DEFAULT, iniFile);
+  }
+
   WCHAR localeFile[MAX_PATH];
   GetModuleFileName(NULL, localeFile, MAX_PATH);
   WCHAR *lastSlash = wcsrchr(localeFile, '\\');
   if (lastSlash) {
     *lastSlash = '\0';
+  }
+
+  WCHAR enIni[MAX_PATH];
+  swprintf_s(enIni, MAX_PATH, L"%s\\keycastow_en.ini", localeFile);
+  if (GetFileAttributes(enIni) == INVALID_FILE_ATTRIBUTES) {
+    ExtractResource(IDR_INI_EN, enIni);
+  }
+
+  WCHAR zhIni[MAX_PATH];
+  swprintf_s(zhIni, MAX_PATH, L"%s\\keycastow_zh.ini", localeFile);
+  if (GetFileAttributes(zhIni) == INVALID_FILE_ATTRIBUTES) {
+    ExtractResource(IDR_INI_ZH, zhIni);
   }
 
   LANGID langId = GetUserDefaultUILanguage();
