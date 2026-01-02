@@ -999,12 +999,17 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                 Shell_NotifyIcon( NIM_ADD, &nid );
 
                 hPopMenu = CreatePopupMenu();
-                AppendMenu( hPopMenu, MF_STRING, MENU_CONFIG,  L"&Settings..." );
-                AppendMenu( hPopMenu, MF_STRING, MENU_RESTORE,  L"&Restore default settings" );
+                // AppendMenu( hPopMenu, MF_STRING, MENU_CONFIG,  L"&Settings..." );
+                AppendMenu( hPopMenu, MF_STRING, MENU_CONFIG,  L"&设置" );
+                // AppendMenu( hPopMenu, MF_STRING, MENU_RESTORE,  L"&Restore default settings" );
+                AppendMenu( hPopMenu, MF_STRING, MENU_RESTORE,  L"&恢复默认设置" );
+                // TODO: 添加语言切换按钮
+                // AppendMenu( hPopMenu, MF_STRING, MENU_LANGUAGES,  L"&Languages" );
 #ifdef _DEBUG
                 AppendMenu( hPopMenu, MF_STRING, MENU_REPLAY,  L"Re&play" );
 #endif
-                AppendMenu( hPopMenu, MF_STRING, MENU_EXIT,    L"E&xit" );
+                // AppendMenu( hPopMenu, MF_STRING, MENU_EXIT,    L"E&xit" );
+                AppendMenu( hPopMenu, MF_STRING, MENU_EXIT,    L"&退出" );
                 SetMenuDefaultItem( hPopMenu, MENU_CONFIG, FALSE );
             }
             break;
