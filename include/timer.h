@@ -5,6 +5,11 @@ by ken.loveday
 
 v1.0 2013 ArmyOfPirates
 */
+#ifndef _TIMER_H
+#define _TIMER_H
+
+#include <windows.h>
+
 static void CALLBACK TimerProc(void *, BOOLEAN);
 static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled);
 
@@ -41,7 +46,7 @@ public:
 
   void Stop() {
     if (m_hTimer) {
-      DeleteTimerQueueTimer(NULL, m_hTimer, INVALID_HANDLE_VALUE);
+      DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
       m_hTimer = NULL;
     }
   }
@@ -74,3 +79,5 @@ static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled) {
   timer->SetCount(timer->GetCount() + 1);
   timer->OnTimedEvent();
 };
+
+#endif // _TIMER_H

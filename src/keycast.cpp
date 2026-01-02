@@ -1167,6 +1167,9 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
       }
       prepareLabels();
       saveSettings();
+      EndDialog(hwndDlg, wParam);
+      previewTimer.Stop();
+      return TRUE;
     case IDCANCEL:
       EndDialog(hwndDlg, wParam);
       previewTimer.Stop();
