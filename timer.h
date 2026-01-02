@@ -5,94 +5,72 @@ by ken.loveday
 
 v1.0 2013 ArmyOfPirates
 */
-static void CALLBACK TimerProc(void*, BOOLEAN);
-static void CALLBACK TimerProcOnce(void* param, BOOLEAN timerCalled);
+static void CALLBACK TimerProc(void *, BOOLEAN);
+static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled);
 
 ///////////////////////////////////////////////////////////////////////////////
 //
 // class CTimer
 //
-class CTimer
-{
+class CTimer {
 public:
-    CTimer()
-    {
-        m_hTimer = NULL;
-        m_mutexCount = 0;
+  CTimer() {
+    m_hTimer = NULL;
+    m_mutexCount = 0;
+  }
+
+  virtual ~CTimer() { Stop(); }
+
+  bool Start(unsigned int interval,    // interval in ms
+             bool immediately = false, // true to call first event immediately
+             bool once = false)        // true to call timed event only once
+  {
+    if (m_hTimer) {
+      Stop();
     }
 
-    virtual ~CTimer()
-    {
-        Stop();
-    }
+    SetCount(0);
 
-    bool Start(unsigned int interval,   // interval in ms
-               bool immediately = false,// true to call first event immediately
-               bool once = false)       // true to call timed event only once
-    {
-        if( m_hTimer )
-        {
-            Stop();
-        }
+    BOOL success =
+        CreateTimerQueueTimer(&m_hTimer, NULL, once ? TimerProcOnce : TimerProc,
+                              this, immediately ? 0 : interval,
+                              once ? 0 : interval, WT_EXECUTEINTIMERTHREAD);
 
-        SetCount(0);
+    return (success != 0);
+  }
 
-        BOOL success = CreateTimerQueueTimer( &m_hTimer,
-                                              NULL,
-                                              once ? TimerProcOnce : TimerProc,
-                                              this,
-                                              immediately ? 0 : interval,
-                                              once ? 0 : interval,
-                                              WT_EXECUTEINTIMERTHREAD);
+  void Stop() {
+    DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
+    m_hTimer = NULL;
+  }
 
-        return( success != 0 );
-    }
+  void (*OnTimedEvent)();
 
-    void Stop()
-    {
-        DeleteTimerQueueTimer( NULL, m_hTimer, NULL );
-        m_hTimer = NULL ;
-    }
+  void SetCount(int value) { InterlockedExchange(&m_mutexCount, value); }
 
-    void (*OnTimedEvent)();
+  int GetCount() { return InterlockedExchangeAdd(&m_mutexCount, 0); }
 
-    void SetCount(int value)
-    {
-        InterlockedExchange( &m_mutexCount, value );
-    }
-
-    int GetCount()
-    {
-        return InterlockedExchangeAdd( &m_mutexCount, 0 );
-    }
-
-    bool Enabled()
-    {
-        return m_hTimer != NULL;
-    }
+  bool Enabled() { return m_hTimer != NULL; }
 
 private:
-    HANDLE m_hTimer;
-    long m_mutexCount;
+  HANDLE m_hTimer;
+  long m_mutexCount;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 //
 // TimerProc
 //
-static void CALLBACK TimerProc(void* param, BOOLEAN timerCalled)
-{
-    CTimer* timer = static_cast<CTimer*>(param);
-    timer->SetCount( timer->GetCount()+1 );
-    timer->OnTimedEvent();
+static void CALLBACK TimerProc(void *param, BOOLEAN timerCalled) {
+  CTimer *timer = static_cast<CTimer *>(param);
+  timer->SetCount(timer->GetCount() + 1);
+  timer->OnTimedEvent();
 };
 
-
-static void CALLBACK TimerProcOnce(void* param, BOOLEAN timerCalled)
-{
-    CTimer* timer = static_cast<CTimer*>(param);
-    timer->SetCount( timer->GetCount()+1 );
-    timer->OnTimedEvent();
-    if( timer->Enabled() )
-        timer->Stop();
+static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled) {
+  CTimer *timer = static_cast<CTimer *>(param);
+  timer->SetCount(timer->GetCount() + 1);
+  timer->OnTimedEvent();
+  if (timer->Enabled())
+    timer->Stop();
 };

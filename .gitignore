@@ -1,2 +1,5 @@
-Release/
-keycastow/n
+/Debug
+/Release
+/.vs
+/keycastow.aps
+/keycastow.vcxproj.user
