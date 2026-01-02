@@ -16,6 +16,7 @@
 #include <gdiplus.h>
 using namespace Gdiplus;
 
+#include "locale_manager.h"
 #include "resource.h"
 #include "timer.h"
 CTimer showTimer;
@@ -881,6 +882,98 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
   switch (msg) {
   case WM_INITDIALOG: {
     renderSettingsData(hwndDlg);
+
+    SetDlgItemText(hwndDlg, IDOK, I18N(L"Settings", L"Save", L"Save").c_str());
+    SetDlgItemText(hwndDlg, IDCANCEL,
+                   I18N(L"Settings", L"Cancel", L"Cancel").c_str());
+    SetDlgItemText(hwndDlg, IDC_BGCOLOR,
+                   I18N(L"Settings", L"ChooseColor", L"Choose Color").c_str());
+    SetDlgItemText(hwndDlg, IDC_TEXTCOLOR,
+                   I18N(L"Settings", L"ChooseColor", L"Choose Color").c_str());
+    SetDlgItemText(hwndDlg, IDC_BORDERCOLOR,
+                   I18N(L"Settings", L"ChooseColor", L"Choose Color").c_str());
+    SetDlgItemText(hwndDlg, IDC_TEXTFONT,
+                   I18N(L"Settings", L"ChooseFont", L"Choose Font").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_GROUP_TOGGLECAPTURING,
+        I18N(L"Settings", L"ToggleCapturing", L"Toggle Capturing").c_str());
+
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_KEYSTROKEDELAY,
+        I18N(L"Settings", L"KeystrokeDelay", L"Keystroke Delay(ms):").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_LINGERTIME,
+        I18N(L"Settings", L"LingerTime", L"Linger Time(ms):").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_FADEDURATION,
+        I18N(L"Settings", L"FadeDuration", L"Fade Duration(ms):").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_TEXTFONT,
+                   I18N(L"Settings", L"TextFont", L"Text Font:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_BGCOLOR,
+        I18N(L"Settings", L"BackgroundColor", L"Background Color:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_TEXTCOLOR,
+                   I18N(L"Settings", L"TextColor", L"Text Color:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_TEXTOPACITY,
+        I18N(L"Settings", L"TextOpacity", L"Text Opacity(0-255):").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_MAXIMUMLINES,
+        I18N(L"Settings", L"MaximumLines", L"Maximum Lines:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_COMBSCHEME,
+        I18N(L"Settings", L"CombinationChars", L"Combination Chars:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_VISIBLEMODIFIER,
+                   I18N(L"Settings", L"DisplayStandaloneModifierKey",
+                        L"Display Standalone Modifier Key:")
+                       .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_VISIBLESHIFT,
+        I18N(L"Settings", L"ShiftAsModifierKey", L"SHIFT as Modifier Key:")
+            .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_ONLYCOMMANDKEYS,
+        I18N(L"Settings", L"OnlyCommandKeys", L"Only Command Keys:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_KEYAUTOREPEAT,
+        I18N(L"Settings", L"HoldDownToRepeat", L"Hold Down to Repeat:")
+            .c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_BORDERSIZE,
+                   I18N(L"Settings", L"BorderSize", L"Border Size:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_BORDERCOLOR,
+                   I18N(L"Settings", L"BorderColor", L"Border Color:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_BORDEROPACITY,
+        I18N(L"Settings", L"BorderOpacity", L"Border Opacity(0-255):").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_LABELSPACING,
+        I18N(L"Settings", L"LabelSpacing", L"Label Spacing:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_CORNERSIZE,
+                   I18N(L"Settings", L"CornerSize", L"Corner Size:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_MOUSECAPTURING,
+                   I18N(L"Settings", L"MouseAction", L"Mouse Action:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_MOUSECAPTURINGMOD,
+                   I18N(L"Settings", L"MouseOnlyWithModifier",
+                        L"Mouse Only With Modifier:")
+                       .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_MERGEMOUSEACTIONS,
+        I18N(L"Settings", L"DetectClickDblClick", L"Detect Click/DblClick:")
+            .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_BGOPACITY,
+        I18N(L"Settings", L"BackgroundOpacity", L"Background Opacity(0-255):")
+            .c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_BRANDING,
+                   I18N(L"Settings", L"Branding", L"Branding:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_ALIGNMENT,
+                   I18N(L"Settings", L"Alignment", L"Alignment:").c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_POSITION,
+                   I18N(L"Settings", L"Position", L"Position:").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_STATIC_DRAGGABLELABEL,
+        I18N(L"Settings", L"DraggableLabel", L"Draggable Label:").c_str());
+
     GetWindowRect(hwndDlg, &settingsDlgRect);
     SetWindowPos(hwndDlg, 0,
                  desktopRect.right - desktopRect.left - settingsDlgRect.right +
@@ -890,10 +983,14 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
                  0, 0, SWP_NOSIZE);
     GetWindowRect(hwndDlg, &settingsDlgRect);
     CreateToolTip(hwndDlg, IDC_COMBSCHEME,
-                  L"[+] to display combination keys like [Alt + Tab].");
+                  I18N(L"Settings", L"CombinationKeyTooltip",
+                       L"[+] to display combination keys like [Alt + Tab].")
+                      .c_str());
     HWND hCtrl = GetDlgItem(hwndDlg, IDC_ALIGNMENT);
-    ComboBox_InsertString(hCtrl, 0, L"Left");
-    ComboBox_InsertString(hCtrl, 1, L"Right");
+    ComboBox_InsertString(hCtrl, 0,
+                          I18N(L"Settings", L"AlignmentLeft", L"Left").c_str());
+    ComboBox_InsertString(
+        hCtrl, 1, I18N(L"Settings", L"AlignmentRight", L"Right").c_str());
   }
     return TRUE;
   case WM_NOTIFY:
@@ -1013,10 +1110,14 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
         tcKey = VkKeyScanEx(tmp[0], GetKeyboardLayout(0));
         UnregisterHotKey(NULL, 1);
         if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
-          MessageBox(NULL,
-                     L"Unable to register hotkey, you probably need go to "
-                     L"settings to redefine your hotkey for toggle capturing.",
-                     L"Warning", MB_OK | MB_ICONWARNING);
+          MessageBox(
+              NULL,
+              I18N(L"Messages", L"UnableToRegisterHotkey",
+                   L"Unable to register hotkey, you probably need go to "
+                   L"settings to redefine your hotkey for toggle capturing.")
+                  .c_str(),
+              I18N(L"Messages", L"Warning", L"Warning").c_str(),
+              MB_OK | MB_ICONWARNING);
         }
       }
       prepareLabels();
@@ -1084,22 +1185,29 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYMSG;
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
-    lstrcpy(nid.szTip, L"KeyCast On Windows by brook hong");
+    lstrcpy(nid.szTip,
+            I18N(L"Messages", L"TrayTip", L"KeyCast On Windows by brook hong")
+                .c_str());
     Shell_NotifyIcon(NIM_ADD, &nid);
 
     hPopMenu = CreatePopupMenu();
     // AppendMenu( hPopMenu, MF_STRING, MENU_CONFIG,  L"&Settings..." );
-    AppendMenu(hPopMenu, MF_STRING, MENU_CONFIG, L"&设置");
+    AppendMenu(hPopMenu, MF_STRING, MENU_CONFIG,
+               I18N(L"Menu", L"Settings", L"&Settings...").c_str());
     // AppendMenu( hPopMenu, MF_STRING, MENU_RESTORE,  L"&Restore default
     // settings" );
-    AppendMenu(hPopMenu, MF_STRING, MENU_RESTORE, L"&恢复默认设置");
+    AppendMenu(
+        hPopMenu, MF_STRING, MENU_RESTORE,
+        I18N(L"Menu", L"RestoreDefaultSettings", L"&Restore default settings")
+            .c_str());
     // TODO: 添加语言切换按钮
     // AppendMenu( hPopMenu, MF_STRING, MENU_LANGUAGES,  L"&Languages" );
 #ifdef _DEBUG
     AppendMenu(hPopMenu, MF_STRING, MENU_REPLAY, L"Re&play");
 #endif
     // AppendMenu( hPopMenu, MF_STRING, MENU_EXIT,    L"E&xit" );
-    AppendMenu(hPopMenu, MF_STRING, MENU_EXIT, L"&退出");
+    AppendMenu(hPopMenu, MF_STRING, MENU_EXIT,
+               I18N(L"Menu", L"Exit", L"E&xit").c_str());
     SetMenuDefaultItem(hPopMenu, MENU_CONFIG, FALSE);
   } break;
   case WM_TRAYMSG: {
@@ -1273,6 +1381,31 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   GetModuleFileName(NULL, iniFile, MAX_PATH);
   iniFile[wcslen(iniFile) - 4] = '\0';
   wcscat_s(iniFile, MAX_PATH, L".ini");
+
+  WCHAR localeFile[MAX_PATH];
+  GetModuleFileName(NULL, localeFile, MAX_PATH);
+  WCHAR *lastSlash = wcsrchr(localeFile, '\\');
+  if (lastSlash) {
+    *lastSlash = '\0';
+  }
+
+  LANGID langId = GetUserDefaultUILanguage();
+  if ((langId & 0xFF) == LANG_CHINESE) {
+    wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
+  } else {
+    wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
+  }
+
+  if (GetFileAttributes(localeFile) == INVALID_FILE_ATTRIBUTES) {
+    GetModuleFileName(NULL, localeFile, MAX_PATH);
+    lastSlash = wcsrchr(localeFile, '\\');
+    if (lastSlash)
+      *lastSlash = '\0';
+    wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
+  }
+
+  LocaleManager::GetInstance().Load(localeFile);
+
 #ifdef _DEBUG
   wcscpy_s(capFile, MAX_PATH, iniFile);
   capFile[wcslen(capFile) - 4] = '\0';
@@ -1290,7 +1423,11 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
   if (!MyRegisterClassEx(hThisInst, szWinName, WindowFunc)) {
-    MessageBox(NULL, L"Could not register window class", L"Error", MB_OK);
+    MessageBox(NULL,
+               I18N(L"Messages", L"CouldNotRegisterWindowClass",
+                    L"Could not register window class")
+                   .c_str(),
+               I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
     return 0;
   }
 
@@ -1300,7 +1437,11 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                             1, 1, // Width and height of window
                             NULL, NULL, hThisInst, NULL);
   if (!hMainWnd) {
-    MessageBox(NULL, L"Could not create window", L"Error", MB_OK);
+    MessageBox(
+        NULL,
+        I18N(L"Messages", L"CouldNotCreateWindow", L"Could not create window")
+            .c_str(),
+        I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
     return 0;
   }
 
@@ -1315,9 +1456,12 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
 
   if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
     MessageBox(NULL,
-               L"Unable to register hotkey, you probably need go to settings "
-               L"to redefine your hotkey for toggle capturing.",
-               L"Warning", MB_OK | MB_ICONWARNING);
+               I18N(L"Messages", L"UnableToRegisterHotkey",
+                    L"Unable to register hotkey, you probably need go to "
+                    L"settings to redefine your hotkey for toggle capturing.")
+                   .c_str(),
+               I18N(L"Messages", L"Warning", L"Warning").c_str(),
+               MB_OK | MB_ICONWARNING);
   }
   UpdateWindow(hMainWnd);
 
@@ -1344,13 +1488,17 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   while (GetMessage(&msg, NULL, 0, 0)) {
     if (msg.message == WM_HOTKEY) {
       if (kbdhook) {
-        showText(L"\u263b - KeyCastOW OFF", 1);
+        std::wstring msg =
+            L"\u263b - " + I18N(L"Messages", L"KeyCastOWOff", L"KeyCastOW OFF");
+        showText(msg.c_str(), 1);
         UnhookWindowsHookEx(kbdhook);
         kbdhook = NULL;
         UnhookWindowsHookEx(moshook);
         moshook = NULL;
       } else {
-        showText(L"\u263b - KeyCastOW ON", 1);
+        std::wstring msg =
+            L"\u263b - " + I18N(L"Messages", L"KeyCastOWOn", L"KeyCastOW ON");
+        showText(msg.c_str(), 1);
         kbdhook =
             SetWindowsHookEx(WH_KEYBOARD_LL, LLKeyboardProc, hInstance, NULL);
         moshook = SetWindowsHookEx(WH_MOUSE_LL, LLMouseProc, hThisInst, 0);
