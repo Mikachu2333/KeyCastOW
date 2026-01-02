@@ -773,7 +773,7 @@ void loadSettings() {
   labelSettings.font.lfOutPrecision = OUT_DEFAULT_PRECIS;
   labelSettings.font.lfClipPrecision = CLIP_DEFAULT_PRECIS;
   labelSettings.font.lfQuality = ANTIALIASED_QUALITY;
-  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE, TEXT("Arial Black"));
+  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE, TEXT("Microsoft YaHei"));
   GetPrivateProfileStruct(L"KeyCastOW", L"labelFont", &labelSettings.font,
                           sizeof(labelSettings.font), iniFile);
 }
@@ -1438,9 +1438,8 @@ BOOL ExtractResource(DWORD resourceId, LPCWSTR outputFilename) {
   if (resourceSize == 0)
     return FALSE;
 
-  HANDLE hFile =
-      CreateFile(outputFilename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                 FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE hFile = CreateFile(outputFilename, GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
   if (hFile == INVALID_HANDLE_VALUE)
     return FALSE;
 
@@ -1508,32 +1507,33 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   LANGID langId = GetUserDefaultUILanguage();
   WCHAR langCode[10] = {0};
   LCID lcid = MAKELCID(langId, SORT_DEFAULT);
-  
+
   // Try to get ISO 639-1 language name (e.g., "fr", "en", "zh")
   if (GetLocaleInfo(lcid, LOCALE_SISO639LANGNAME, langCode, 10) > 0) {
-      WCHAR targetIni[MAX_PATH];
-      swprintf_s(targetIni, MAX_PATH, L"%s\\keycastow_%s.ini", localeFile, langCode);
-      
-      // If the specific language file exists, use it
-      if (GetFileAttributes(targetIni) != INVALID_FILE_ATTRIBUTES) {
-          wcscat_s(localeFile, MAX_PATH, L"\\keycastow_");
-          wcscat_s(localeFile, MAX_PATH, langCode);
-          wcscat_s(localeFile, MAX_PATH, L".ini");
-      } else {
-          // Fallback logic if specific file doesn't exist
-          if ((langId & 0xFF) == LANG_CHINESE) {
-            wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
-          } else {
-            wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
-          }
-      }
-  } else {
-      // Fallback if GetLocaleInfo fails
+    WCHAR targetIni[MAX_PATH];
+    swprintf_s(targetIni, MAX_PATH, L"%s\\keycastow_%s.ini", localeFile,
+               langCode);
+
+    // If the specific language file exists, use it
+    if (GetFileAttributes(targetIni) != INVALID_FILE_ATTRIBUTES) {
+      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_");
+      wcscat_s(localeFile, MAX_PATH, langCode);
+      wcscat_s(localeFile, MAX_PATH, L".ini");
+    } else {
+      // Fallback logic if specific file doesn't exist
       if ((langId & 0xFF) == LANG_CHINESE) {
         wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
       } else {
         wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
       }
+    }
+  } else {
+    // Fallback if GetLocaleInfo fails
+    if ((langId & 0xFF) == LANG_CHINESE) {
+      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
+    } else {
+      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
+    }
   }
 
   if (GetFileAttributes(localeFile) == INVALID_FILE_ATTRIBUTES) {
