@@ -1,4 +1,4 @@
-// Copyright © 2015 - 2025 Brook Hong && Mikachu2333. MIT LICENSE. All Rights Reserved.
+// Copyright © 2015 - 2026 Brook Hong && Mikachu2333. MIT LICENSE. All Rights Reserved.
 //
 
 // msbuild /p:platform=win32 /p:Configuration=Release
