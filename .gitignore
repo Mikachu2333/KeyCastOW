@@ -3,3 +3,10 @@
 /.vs
 /keycastow.aps
 /keycastow.vcxproj.user
+*.tlog
+*.obj
+*.iobj
+*.ipdb
+*.recipe
+*.pdb
+*.res
