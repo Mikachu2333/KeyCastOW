@@ -111,8 +111,8 @@ int replayStatus = 0;
 struct Displayed {
   DWORD tm;
   int behavior;
-  size_t len;
-  Displayed(DWORD t, int b, size_t l) {
+  DWORD len;
+  Displayed(DWORD t, int b, DWORD l) {
     tm = t;
     behavior = b;
     len = l;
@@ -154,7 +154,7 @@ void stamp(HWND hwnd, LPCWSTR text) {
   HBITMAP memBitmap =
       ::CreateCompatibleBitmap(hdc, desktopRect.right - desktopRect.left,
                                desktopRect.bottom - desktopRect.top);
-  ::SelectObject(memDC, memBitmap);
+  HBITMAP hOldBitmap = (HBITMAP)::SelectObject(memDC, memBitmap);
   Graphics g(memDC);
   g.SetSmoothingMode(SmoothingModeAntiAlias);
   g.SetTextRenderingHint(TextRenderingHintAntiAlias);
@@ -195,8 +195,9 @@ void stamp(HWND hwnd, LPCWSTR text) {
   blendFunction.SourceConstantAlpha = 255;
   ::UpdateLayeredWindow(hwnd, hdc, &ptDst, &wndSize, memDC, &ptSrc, 0,
                         &blendFunction, 2);
-  ::DeleteDC(memDC);
+  ::SelectObject(memDC, hOldBitmap);
   ::DeleteObject(memBitmap);
+  ::DeleteDC(memDC);
   ReleaseDC(hwnd, hdc);
 }
 void updateLayeredWindow(HWND hwnd) {
@@ -328,16 +329,32 @@ static void startFade() {
   }
 }
 
+void ensureSpace(WCHAR *dest, size_t len) {
+  for (DWORD i = 0; i < labelCount - 1; i++) {
+    if (keyLabels[i].length > 0) {
+      WCHAR *start = keyLabels[i].text;
+      WCHAR *end = start + keyLabels[i].length;
+      if (start < dest + len && end > dest) {
+        keyLabels[i].length = 0;
+        keyLabels[i].time = 0;
+        eraseLabel(i);
+      }
+    }
+  }
+}
+
 bool outOfLine(LPCWSTR text) {
   size_t newLen = wcslen(text);
   if (keyLabels[labelCount - 1].text + keyLabels[labelCount - 1].length +
           newLen >=
       textBufferEnd) {
+    ensureSpace(textBuffer, keyLabels[labelCount - 1].length);
     wcscpy_s(textBuffer, MAXCHARS, keyLabels[labelCount - 1].text);
     keyLabels[labelCount - 1].text = textBuffer;
   }
   LPWSTR tmp =
       keyLabels[labelCount - 1].text + keyLabels[labelCount - 1].length;
+  ensureSpace(tmp, newLen);
   wcscpy_s(tmp, (textBufferEnd - tmp), text);
   RectF box;
   PointF origin(0, 0);
@@ -361,7 +378,7 @@ void showText(LPCWSTR text, int behavior = 0) {
 
 #ifdef _DEBUG
   if (replayStatus == 0 && capStream) {
-    Displayed dp(GetTickCount(), behavior, newLen);
+    Displayed dp(GetTickCount(), behavior, (DWORD)newLen);
     fwrite(&dp, sizeof(Displayed), 1, capStream);
     fwrite(text, sizeof(WCHAR), newLen, capStream);
     fflush(capStream);
@@ -370,9 +387,10 @@ void showText(LPCWSTR text, int behavior = 0) {
 
   DWORD i;
   if (behavior == 2) {
+    ensureSpace(keyLabels[labelCount - 1].text, newLen);
     wcscpy_s(keyLabels[labelCount - 1].text,
              textBufferEnd - keyLabels[labelCount - 1].text, text);
-    keyLabels[labelCount - 1].length = newLen;
+    keyLabels[labelCount - 1].length = (DWORD)newLen;
   } else if (behavior == 3) {
     wcscpy_s(deferredLabel, 64, text);
     deferredTime = 120;
@@ -399,19 +417,21 @@ void showText(LPCWSTR text, int behavior = 0) {
     if (keyLabels[labelCount - 1].text + newLen >= textBufferEnd) {
       keyLabels[labelCount - 1].text = textBuffer;
     }
+    ensureSpace(keyLabels[labelCount - 1].text, newLen);
     wcscpy_s(keyLabels[labelCount - 1].text,
              textBufferEnd - keyLabels[labelCount - 1].text, text);
-    keyLabels[labelCount - 1].length = newLen;
+    keyLabels[labelCount - 1].length = (DWORD)newLen;
   } else {
     LPWSTR tmp =
         keyLabels[labelCount - 1].text + keyLabels[labelCount - 1].length;
     if (tmp + newLen >= textBufferEnd) {
       tmp = textBuffer;
       keyLabels[labelCount - 1].text = tmp;
-      keyLabels[labelCount - 1].length = newLen;
+      keyLabels[labelCount - 1].length = (DWORD)newLen;
     } else {
-      keyLabels[labelCount - 1].length += newLen;
+      keyLabels[labelCount - 1].length += (DWORD)newLen;
     }
+    ensureSpace(tmp, newLen);
     wcscpy_s(tmp, (textBufferEnd - tmp), text);
   }
   keyLabels[labelCount - 1].time =
@@ -446,33 +466,54 @@ void updateCanvasSize(const POINT &pt) {
   log(line);
 #endif
 }
+
+HDC g_hdcBuffer = NULL;
+HBITMAP g_hbitmap = NULL;
+HBITMAP g_hBitmapOld = NULL;
+HFONT g_hlabelFont = NULL;
+
 void createCanvas() {
   HDC hdc = GetDC(hMainWnd);
-  HDC hdcBuffer = CreateCompatibleDC(hdc);
-  HBITMAP hbitmap =
-      CreateCompatibleBitmap(hdc, desktopRect.right - desktopRect.left,
-                             desktopRect.bottom - desktopRect.top);
-  HBITMAP hBitmapOld = (HBITMAP)SelectObject(hdcBuffer, (HGDIOBJ)hbitmap);
-  ReleaseDC(hMainWnd, hdc);
-  DeleteObject(hBitmapOld);
   if (gCanvas) {
     delete gCanvas;
+    gCanvas = NULL;
   }
-  gCanvas = new Graphics(hdcBuffer);
+  if (g_hdcBuffer) {
+    SelectObject(g_hdcBuffer, g_hBitmapOld);
+    DeleteObject(g_hbitmap);
+    DeleteDC(g_hdcBuffer);
+    g_hdcBuffer = NULL;
+    g_hbitmap = NULL;
+  }
+
+  g_hdcBuffer = CreateCompatibleDC(hdc);
+  g_hbitmap = CreateCompatibleBitmap(hdc, desktopRect.right - desktopRect.left,
+                                     desktopRect.bottom - desktopRect.top);
+  g_hBitmapOld = (HBITMAP)SelectObject(g_hdcBuffer, (HGDIOBJ)g_hbitmap);
+  ReleaseDC(hMainWnd, hdc);
+
+  gCanvas = new Graphics(g_hdcBuffer);
   gCanvas->SetSmoothingMode(SmoothingModeAntiAlias);
   gCanvas->SetTextRenderingHint(TextRenderingHintAntiAlias);
 }
 void prepareLabels() {
   HDC hdc = GetDC(hMainWnd);
-  HFONT hlabelFont = CreateFontIndirect(&labelSettings.font);
-  HFONT hFontOld = (HFONT)SelectObject(hdc, hlabelFont);
-  DeleteObject(hFontOld);
-
   if (fontPlus) {
     delete fontPlus;
+    fontPlus = NULL;
   }
-  fontPlus = new Font(hdc, hlabelFont);
+  if (g_hlabelFont) {
+    DeleteObject(g_hlabelFont);
+    g_hlabelFont = NULL;
+  }
+
+  g_hlabelFont = CreateFontIndirect(&labelSettings.font);
+  HFONT hFontOld = (HFONT)SelectObject(hdc, g_hlabelFont);
+
+  fontPlus = new Font(hdc, g_hlabelFont);
+  SelectObject(hdc, hFontOld);
   ReleaseDC(hMainWnd, hdc);
+
   RectF box;
   PointF origin(0, 0);
   gCanvas->MeasureString(L"\u263b - KeyCastOW OFF", 16, fontPlus, origin, &box);
@@ -1334,8 +1375,15 @@ ATOM MyRegisterClassEx(HINSTANCE hInst, LPCWSTR className, WNDPROC wndProc) {
 }
 void CreateMiniDump(LPEXCEPTION_POINTERS lpExceptionInfo) {
   // Open a file
-  HANDLE hFile = CreateFile(L"MiniDump.dmp", GENERIC_READ | GENERIC_WRITE, 0,
-                            NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  WCHAR dumpFile[MAX_PATH];
+  wcscpy_s(dumpFile, MAX_PATH, iniFile);
+  WCHAR *dot = wcsrchr(dumpFile, L'.');
+  if (dot)
+    *dot = L'\0';
+  wcscat_s(dumpFile, MAX_PATH, L".dmp");
+
+  HANDLE hFile = CreateFile(dumpFile, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
   if (hFile != NULL && hFile != INVALID_HANDLE_VALUE) {
 
@@ -1351,16 +1399,20 @@ void CreateMiniDump(LPEXCEPTION_POINTERS lpExceptionInfo) {
                           mdt, (lpExceptionInfo != 0) ? &mdei : 0, 0, 0);
 
     if (!retv) {
-      printf(("MiniDumpWriteDump failed. Error: %u \n"), GetLastError());
+      char msg[128];
+      sprintf_s(msg, "MiniDumpWriteDump failed. Error: %u \n", GetLastError());
+      OutputDebugStringA(msg);
     } else {
-      printf(("Minidump created.\n"));
+      OutputDebugStringA("Minidump created.\n");
     }
 
     // Close the file
     CloseHandle(hFile);
 
   } else {
-    printf(("CreateFile failed. Error: %u \n"), GetLastError());
+    char msg[128];
+    sprintf_s(msg, "CreateFile failed. Error: %u \n", GetLastError());
+    OutputDebugStringA(msg);
   }
 }
 
@@ -1392,7 +1444,10 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   InitCommonControlsEx(&icex);
 
   GetModuleFileName(NULL, iniFile, MAX_PATH);
-  iniFile[wcslen(iniFile) - 4] = '\0';
+  WCHAR *dot = wcsrchr(iniFile, L'.');
+  if (dot) {
+    *dot = L'\0';
+  }
   wcscat_s(iniFile, MAX_PATH, L".ini");
 
   WCHAR localeFile[MAX_PATH];
@@ -1462,6 +1517,13 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   updateCanvasSize(deskOrigin);
   hDlgSettings = CreateDialog(hThisInst, MAKEINTRESOURCE(IDD_DLGSETTINGS), NULL,
                               (DLGPROC)SettingsWndProc);
+  if (!hDlgSettings) {
+    MessageBox(NULL,
+               I18N(L"Messages", L"CouldNotCreateSettingsDialog",
+                    L"Could not create settings dialog")
+                   .c_str(),
+               I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+  }
   MyRegisterClassEx(hThisInst, L"STAMP", DraggableWndProc);
   hWndStamp = CreateWindowEx(WS_EX_LAYERED | WS_EX_NOACTIVATE, L"STAMP",
                              L"STAMP", WS_VISIBLE | WS_POPUP, 0, 0, 1, 1, NULL,
@@ -1494,6 +1556,13 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
 
   kbdhook = SetWindowsHookEx(WH_KEYBOARD_LL, LLKeyboardProc, hThisInst, NULL);
   moshook = SetWindowsHookEx(WH_MOUSE_LL, LLMouseProc, hThisInst, 0);
+  if (!kbdhook || !moshook) {
+    MessageBox(
+        NULL,
+        I18N(L"Messages", L"CouldNotInstallHooks", L"Could not install hooks")
+            .c_str(),
+        I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+  }
   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
   _set_abort_behavior(0, _WRITE_ABORT_MSG);
   SetUnhandledExceptionFilter(MyUnhandledExceptionFilter);
@@ -1527,6 +1596,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   UnregisterHotKey(NULL, 1);
   delete gCanvas;
   delete fontPlus;
+  DeleteObject(hlabelFont);
 #ifdef _DEBUG
   fclose(capStream);
   fclose(logStream);

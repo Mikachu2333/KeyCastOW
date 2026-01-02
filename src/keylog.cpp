@@ -1,8 +1,9 @@
 // Copyright © 2014-2025 Brook Hong. All Rights Reserved.
 
-#include <Windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <windows.h>
 
 #include "keylog.h"
 
@@ -215,7 +216,7 @@ struct ModifierState {
   BOOL altGr;
 };
 
-void addModifiers(LPWSTR str, ModifierState modState) {
+void addModifiers(LPWSTR str, size_t size, ModifierState modState) {
   str[0] = '\0';
 
   struct SetKeyPair {
@@ -235,18 +236,18 @@ void addModifiers(LPWSTR str, ModifierState modState) {
   for (int i = 0; i < 4; i++) {
     if (modKeys[i].keyUsed) {
       if (needSplitter) {
-        wcscat(str, splitter);
+        wcscat_s(str, size, splitter);
       }
-      wcscat(str, getSpecialKey(modKeys[i].vk));
+      wcscat_s(str, size, getSpecialKey(modKeys[i].vk));
       needSplitter = TRUE;
     }
   }
 
   if (modState.altGr) {
     if (needSplitter) {
-      wcscat(str, splitter);
+      wcscat_s(str, size, splitter);
     }
-    wcscat(str, L"AltGr");
+    wcscat_s(str, size, L"AltGr");
     needSplitter = TRUE;
   }
 }
@@ -261,7 +262,6 @@ LPCWSTR getModSpecialKey(UINT vk, BOOL mod = FALSE) {
       wcscpy_s(modsk, 64, L"Shift");
     }
   } else {
-    WCHAR tmp[64];
     LPCWSTR sk = getSpecialKey(vk);
     if (!mod && HIBYTE(sk[0]) == 0) {
       // if the special key is not used with modifierkey, and has not been
@@ -383,7 +383,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
       if (!modifierUsed && visibleModifier &&
           isAnyModifierDown(modifierState)) {
         WCHAR modifierkey[64];
-        addModifiers(modifierkey, modifierState);
+        addModifiers(modifierkey, 64, modifierState);
         swprintf(c, 64, L"%s", modifierkey);
         addBracket(c);
         if (lastvk == k.vkCode) {
@@ -411,7 +411,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
         if (mod) {
           fin = 1;
           WCHAR modifierkey[64];
-          addModifiers(modifierkey, modifierState);
+          addModifiers(modifierkey, 64, modifierState);
           swprintf(tmp, 64, L"%s %c %s", modifierkey, comboChars[1], theKey);
           addBracket(tmp);
           theKey = tmp;
@@ -435,6 +435,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
   int behavior = 1;
   static DWORD mouseButtonDown = 0;
   static DWORD lastClick = 0;
+  static WCHAR lastMouseAction[64] = L"\0";
   BOOL holdButton = FALSE;
   if (positioning) {
     MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
@@ -444,9 +445,17 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
     MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
 
     if (!(ms->flags & LLMHF_INJECTED)) {
+      if (idx != 10) {
+        lastMouseAction[0] = '\0';
+      }
       if (idx == 10) {
         swprintf(c, 64, (int)(ms->mouseData) > 0 ? L"%sUp" : L"%sDown",
                  mouseActions[idx]);
+        if (wcscmp(c, lastMouseAction) == 0) {
+          fadeLastLabel(FALSE);
+          return CallNextHookEx(moshook, nCode, wp, lp);
+        }
+        wcscpy_s(lastMouseAction, 64, c);
       } else if (mergeMouseActions) {
         switch (idx) {
         case 1:
@@ -504,7 +513,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
           modifierState.altGr) {
         modifierUsed = TRUE;
         WCHAR modifierkey[64];
-        addModifiers(modifierkey, modifierState);
+        addModifiers(modifierkey, 64, modifierState);
         swprintf(tmp, 64, L"%s %c %s", modifierkey, comboChars[1], c);
         addBracket(tmp);
         showText(tmp, behavior);

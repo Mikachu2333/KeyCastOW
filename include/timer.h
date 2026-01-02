@@ -40,8 +40,10 @@ public:
   }
 
   void Stop() {
-    DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
-    m_hTimer = NULL;
+    if (m_hTimer) {
+      DeleteTimerQueueTimer(NULL, m_hTimer, INVALID_HANDLE_VALUE);
+      m_hTimer = NULL;
+    }
   }
 
   void (*OnTimedEvent)();
@@ -71,6 +73,4 @@ static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled) {
   CTimer *timer = static_cast<CTimer *>(param);
   timer->SetCount(timer->GetCount() + 1);
   timer->OnTimedEvent();
-  if (timer->Enabled())
-    timer->Stop();
 };
