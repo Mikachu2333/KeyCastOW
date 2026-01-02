@@ -6,14 +6,18 @@
 // rc keycastow.rc && cl -DUNICODE -D_UNICODE keycast.cpp keylog.cpp
 // keycastow.res user32.lib shell32.lib gdi32.lib Comdlg32.lib comctl32.lib
 
-#include <Commctrl.h>
-#include <DbgHelp.h>
 #include <stdio.h>
 #include <windows.h>
-#include <windowsx.h>
+
+#include <Commctrl.h>
+
+#include <DbgHelp.h>
 #pragma comment(lib, "DbgHelp.lib")
 
+#include <windowsx.h>
+
 #include <gdiplus.h>
+
 using namespace Gdiplus;
 
 #include "locale_manager.h"
@@ -299,7 +303,7 @@ static void startFade() {
 
   for (i = 0; i < labelCount; i++) {
     RectF &rt = keyLabels[i].rect;
-    if (keyLabels[i].time > labelSettings.fadeDuration) {
+    if ((unsigned long)keyLabels[i].time > labelSettings.fadeDuration) {
       if (keyLabels[i].fade) {
         keyLabels[i].time -= SHOWTIMER_INTERVAL;
       }
@@ -490,7 +494,7 @@ void prepareLabels() {
     keyLabels[i].rect.X = (REAL)labelSettings.borderSize;
     keyLabels[i].rect.Y = paddingH + unitH * (i + offset) + labelSpacing +
                           labelSettings.borderSize;
-    if (keyLabels[i].time >
+    if ((DWORD)keyLabels[i].time >
         labelSettings.lingerTime + labelSettings.fadeDuration) {
       keyLabels[i].time = labelSettings.lingerTime + labelSettings.fadeDuration;
     }
@@ -570,7 +574,7 @@ BOOL ColorDialog(HWND hWnd, COLORREF &clr) {
   }
   return TRUE;
 }
-HWND CreateToolTip(HWND hDlg, int toolID, LPWSTR pszText) {
+HWND CreateToolTip(HWND hDlg, int toolID, LPCWSTR pszText) {
   // Get the window of the tool.
   HWND hwndTool = GetDlgItem(hDlg, toolID);
 
@@ -590,7 +594,7 @@ HWND CreateToolTip(HWND hDlg, int toolID, LPWSTR pszText) {
   toolInfo.hwnd = hDlg;
   toolInfo.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
   toolInfo.uId = (UINT_PTR)hwndTool;
-  toolInfo.lpszText = pszText;
+  toolInfo.lpszText = (LPWSTR)pszText;
   SendMessage(hwndTip, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
 
   return hwndTip;
@@ -1366,6 +1370,15 @@ LONG __stdcall MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionInfo) {
 }
 int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                    int nWinMode) {
+  HANDLE hMutex =
+      CreateMutexA(nullptr, FALSE, "F78854180B584C7680CCC6EB262D10DD");
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    MessageBoxA(nullptr, "Already Exist.", "Error", MB_OK | MB_ICONERROR);
+    return -1;
+  }
+
+  SetProcessDPIAware();
+
   MSG msg;
 
   hInstance = hThisInst;
