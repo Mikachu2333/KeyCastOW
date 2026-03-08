@@ -1056,7 +1056,9 @@ void getLabelSettings(HWND hwndDlg, LabelSettings &lblSettings) {
 DWORD previewTime = 0;
 #define PREVIEWTIMER_INTERVAL 5
 static void previewLabel() {
-  RECT rt = {12, 58, 222, 218};
+  // Use dialog units so the preview area scales with DPI
+  RECT rt = {8, 22, 148, 95};
+  MapDialogRect(hDlgSettings, &rt);
 
   getLabelSettings(hDlgSettings, previewLabelSettings);
   DWORD mg =
