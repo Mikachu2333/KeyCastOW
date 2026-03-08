@@ -19,6 +19,7 @@
 
 using namespace Gdiplus;
 
+#include "click_animation.h"
 #include "locale_manager.h"
 #include "resource.h"
 #include "timer.h"
@@ -75,30 +76,19 @@ WCHAR comboChars[4];
 POINT deskOrigin;
 
 // Click animation
-#define CLICK_ANIM_MAX 5
-#define CLICK_ANIM_INTERVAL 16
-#define CLICK_ANIM_FRAMES 18
-DWORD clickAnimRadius = 25;
-
-// Click animation types
-#define CLICK_ANIM_LBUTTON 0
-#define CLICK_ANIM_RBUTTON 1
-#define CLICK_ANIM_MBUTTON 2
-#define CLICK_ANIM_XBUTTON1 3
-#define CLICK_ANIM_XBUTTON2 4
-#define CLICK_ANIM_SCROLL_UP 5
-#define CLICK_ANIM_SCROLL_DOWN 6
+DWORD clickAnimRadius = CLICK_ANIM_DEFAULT_RADIUS;
 
 struct ClickAnim {
   HWND hWnd;
   int frame;
   BOOL active;
-  int type;
+  ClickAnimationType type;
   int centerX, centerY;
 };
 ClickAnim clickAnims[CLICK_ANIM_MAX];
 CTimer clickAnimTimer;
-WCHAR *szClickAnimName = L"KeyCastOWClickAnim";
+BOOL clickAnimationAvailable = FALSE;
+const WCHAR *szClickAnimName = L"KeyCastOWClickAnim";
 
 #define MAXLABELS 60
 KeyLabel keyLabels[MAXLABELS];
@@ -111,7 +101,7 @@ POINT canvasOrigin;
 #include "keycast.h"
 #include "keylog.h"
 
-WCHAR *szWinName = L"KeyCastOW";
+const WCHAR *szWinName = L"KeyCastOW";
 HWND hMainWnd;
 HWND hDlgSettings;
 RECT settingsDlgRect;
@@ -119,6 +109,46 @@ HWND hWndStamp;
 HINSTANCE hInstance;
 Graphics *gCanvas = NULL;
 Font *fontPlus = NULL;
+
+static DWORD clampUnsignedValue(int value, DWORD minValue, DWORD maxValue) {
+  if (value < (int)minValue) {
+    return minValue;
+  }
+
+  DWORD clampedValue = (DWORD)value;
+  if (clampedValue > maxValue) {
+    return maxValue;
+  }
+
+  return clampedValue;
+}
+
+static int clampSignedValue(int value, int minValue, int maxValue) {
+  if (value < minValue) {
+    return minValue;
+  }
+  if (value > maxValue) {
+    return maxValue;
+  }
+  return value;
+}
+
+static DWORD readDialogUnsignedValue(HWND hwndDlg, int controlId,
+                                     DWORD minValue, DWORD maxValue) {
+  WCHAR buffer[256];
+  GetDlgItemText(hwndDlg, controlId, buffer, _countof(buffer));
+  return clampUnsignedValue(_wtoi(buffer), minValue, maxValue);
+}
+
+static void updateMainWindowTransparency() {
+  LONG_PTR exStyle = GetWindowLongPtr(hMainWnd, GWL_EXSTYLE);
+  if (draggableLabel) {
+    exStyle &= ~WS_EX_TRANSPARENT;
+  } else {
+    exStyle |= WS_EX_TRANSPARENT;
+  }
+  SetWindowLongPtr(hMainWnd, GWL_EXSTYLE, exStyle);
+}
 
 #define IDI_TRAY 100
 #define WM_TRAYMSG 101
@@ -146,18 +176,32 @@ struct Displayed {
 };
 DWORD WINAPI replay(LPVOID ptr) {
   replayStatus = 1;
-  FILE *stream;
+  FILE *stream = NULL;
   WCHAR tmp[256];
   errno_t err = _wfopen_s(&stream, (LPCWSTR)ptr, L"rb");
+  if (err != 0 || !stream) {
+    replayStatus = 0;
+    return 0;
+  }
+
   Displayed dp(0, 0, 0);
-  fread(&dp, sizeof(Displayed), 1, stream);
-  fread(tmp, sizeof(WCHAR), dp.len, stream);
+  if (fread(&dp, sizeof(Displayed), 1, stream) != 1 ||
+      dp.len >= _countof(tmp) ||
+      fread(tmp, sizeof(WCHAR), dp.len, stream) != dp.len) {
+    fclose(stream);
+    replayStatus = 0;
+    return 0;
+  }
+  tmp[dp.len] = L'\0';
   showText(tmp, dp.behavior);
   DWORD lastTm = dp.tm;
   while (replayStatus == 1 && fread(&dp, sizeof(Displayed), 1, stream) == 1) {
     Sleep(dp.tm - lastTm);
     lastTm = dp.tm;
-    fread(tmp, sizeof(WCHAR), dp.len, stream);
+    if (dp.len >= _countof(tmp) ||
+        fread(tmp, sizeof(WCHAR), dp.len, stream) != dp.len) {
+      break;
+    }
     tmp[dp.len] = '\0';
     showText(tmp, dp.behavior);
   }
@@ -194,8 +238,8 @@ void stamp(HWND hwnd, LPCWSTR text) {
                                    2 * labelSettings.borderSize);
   StringFormat format;
   format.SetAlignment(StringAlignmentCenter);
-  g.MeasureString(text, wcslen(text), fontPlus, layoutSize, &format,
-                  &stringSize);
+  INT textLength = (INT)wcslen(text);
+  g.MeasureString(text, textLength, fontPlus, layoutSize, &format, &stringSize);
   rc.Width = stringSize.Width;
   rc.Height = stringSize.Height;
   SIZE wndSize = {2 * labelSettings.borderSize + (LONG)rc.Width,
@@ -206,11 +250,11 @@ void stamp(HWND hwnd, LPCWSTR text) {
   SolidBrush bgBrush(Color::Color(0xaf007cfe));
   g.FillRectangle(&bgBrush, rc);
   SolidBrush textBrushPlus(Color(0xaf303030));
-  g.DrawString(text, wcslen(text), fontPlus, rc, &format, &textBrushPlus);
+  g.DrawString(text, textLength, fontPlus, rc, &format, &textBrushPlus);
   SolidBrush brushPlus(Color::Color(0xaffefefe));
   rc.X += 2;
   rc.Y += 2;
-  g.DrawString(text, wcslen(text), fontPlus, rc, &format, &brushPlus);
+  g.DrawString(text, textLength, fontPlus, rc, &format, &brushPlus);
 
   POINT ptSrc = {0, 0};
   POINT ptDst = {rt.left, rt.top};
@@ -241,6 +285,10 @@ void updateLayeredWindow(HWND hwnd) {
   gCanvas->ReleaseHDC(hdcBuf);
 }
 void renderClickAnim(ClickAnim &anim) {
+  if (!clickAnimationAvailable || !anim.hWnd) {
+    return;
+  }
+
   REAL progress = (REAL)anim.frame / CLICK_ANIM_FRAMES;
   int alpha = (int)(200 * (1.0f - progress));
   if (alpha < 0)
@@ -321,6 +369,10 @@ void renderClickAnim(ClickAnim &anim) {
   ReleaseDC(anim.hWnd, hdc);
 }
 static void tickClickAnims() {
+  if (!clickAnimationAvailable) {
+    return;
+  }
+
   for (int i = 0; i < CLICK_ANIM_MAX; i++) {
     if (clickAnims[i].active) {
       clickAnims[i].frame++;
@@ -333,7 +385,11 @@ static void tickClickAnims() {
     }
   }
 }
-void triggerClickAnimation(int x, int y, int type) {
+void triggerClickAnimation(int x, int y, ClickAnimationType type) {
+  if (!clickAnimationAvailable) {
+    return;
+  }
+
   int slot = -1;
   for (int i = 0; i < CLICK_ANIM_MAX; i++) {
     if (!clickAnims[i].active) {
@@ -345,6 +401,9 @@ void triggerClickAnimation(int x, int y, int type) {
     slot = 0; // reuse oldest
 
   int wndSize = clickAnimRadius * 2 + 8;
+  if (!clickAnims[slot].hWnd) {
+    return;
+  }
   clickAnims[slot].frame = 0;
   clickAnims[slot].active = TRUE;
   clickAnims[slot].type = type;
@@ -751,9 +810,11 @@ BOOL ColorDialog(HWND hWnd, COLORREF &clr) {
   dlgColor.lCustData = 0;
   dlgColor.lpfnHook = NULL;
 
-  if (ChooseColor(&dlgColor)) {
-    clr = dlgColor.rgbResult;
+  if (!ChooseColor(&dlgColor)) {
+    return FALSE;
   }
+
+  clr = dlgColor.rgbResult;
   return TRUE;
 }
 HWND CreateToolTip(HWND hDlg, int toolID, LPCWSTR pszText) {
@@ -783,7 +844,7 @@ HWND CreateToolTip(HWND hDlg, int toolID, LPCWSTR pszText) {
 }
 void writeSettingInt(LPCTSTR lpKeyName, DWORD dw) {
   WCHAR tmp[256];
-  swprintf(tmp, 256, L"%d", dw);
+  swprintf(tmp, 256, L"%lu", (unsigned long)dw);
   WritePrivateProfileString(L"KeyCastOW", lpKeyName, tmp, iniFile);
 }
 void saveSettings() {
@@ -816,13 +877,7 @@ void saveSettings() {
   writeSettingInt(L"alignment", alignment);
   writeSettingInt(L"onlyCommandKeys", onlyCommandKeys);
   writeSettingInt(L"draggableLabel", draggableLabel);
-  if (draggableLabel) {
-    SetWindowLong(hMainWnd, GWL_EXSTYLE,
-                  GetWindowLong(hMainWnd, GWL_EXSTYLE) & ~WS_EX_TRANSPARENT);
-  } else {
-    SetWindowLong(hMainWnd, GWL_EXSTYLE,
-                  GetWindowLong(hMainWnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
-  }
+  updateMainWindowTransparency();
   writeSettingInt(L"tcModifiers", tcModifiers);
   writeSettingInt(L"tcKey", tcKey);
   WritePrivateProfileString(L"KeyCastOW", L"branding", branding, iniFile);
@@ -839,35 +894,37 @@ void fixDeskOrigin() {
   }
 }
 void loadSettings() {
-  labelSettings.keyStrokeDelay =
-      GetPrivateProfileInt(L"KeyCastOW", L"keyStrokeDelay", 500, iniFile);
-  labelSettings.lingerTime =
-      GetPrivateProfileInt(L"KeyCastOW", L"lingerTime", 1200, iniFile);
-  labelSettings.fadeDuration =
-      GetPrivateProfileInt(L"KeyCastOW", L"fadeDuration", 310, iniFile);
+  labelSettings.keyStrokeDelay = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"keyStrokeDelay", 500, iniFile), 0,
+      10000);
+  labelSettings.lingerTime = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"lingerTime", 1200, iniFile), 0,
+      60000);
+  labelSettings.fadeDuration = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"fadeDuration", 310, iniFile),
+      SHOWTIMER_INTERVAL * 5, 60000);
   labelSettings.bgColor =
       GetPrivateProfileInt(L"KeyCastOW", L"bgColor", RGB(75, 75, 75), iniFile);
   labelSettings.textColor = GetPrivateProfileInt(L"KeyCastOW", L"textColor",
                                                  RGB(255, 255, 255), iniFile);
-  labelSettings.bgOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"bgOpacity", 200, iniFile);
-  labelSettings.textOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"textOpacity", 255, iniFile);
-  labelSettings.borderOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"borderOpacity", 200, iniFile);
+  labelSettings.bgOpacity = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"bgOpacity", 200, iniFile), 0, 255);
+  labelSettings.textOpacity = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"textOpacity", 255, iniFile), 0, 255);
+  labelSettings.borderOpacity = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"borderOpacity", 200, iniFile), 0,
+      255);
   labelSettings.borderColor = GetPrivateProfileInt(L"KeyCastOW", L"borderColor",
                                                    RGB(0, 128, 255), iniFile);
-  labelSettings.borderSize =
-      GetPrivateProfileInt(L"KeyCastOW", L"borderSize", 8, iniFile);
-  labelSettings.cornerSize =
-      GetPrivateProfileInt(L"KeyCastOW", L"cornerSize", 2, iniFile);
-  labelSpacing =
-      GetPrivateProfileInt(L"KeyCastOW", L"labelSpacing", 1, iniFile);
-  maximumLines =
-      GetPrivateProfileInt(L"KeyCastOW", L"maximumLines", 10, iniFile);
-  if (maximumLines == 0) {
-    maximumLines = 1;
-  }
+  labelSettings.borderSize = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"borderSize", 8, iniFile), 0, 64);
+  labelSettings.cornerSize = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"cornerSize", 2, iniFile), 0, 128);
+  labelSpacing = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"labelSpacing", 1, iniFile), 0, 1000);
+  maximumLines = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"maximumLines", 10, iniFile), 1,
+      MAXLABELS);
   deskOrigin.x = GetPrivateProfileInt(L"KeyCastOW", L"offsetX", 2, iniFile);
   deskOrigin.y = GetPrivateProfileInt(L"KeyCastOW", L"offsetY", 2, iniFile);
   MONITORINFO mi;
@@ -889,20 +946,17 @@ void loadSettings() {
       GetPrivateProfileInt(L"KeyCastOW", L"mergeMouseActions", 1, iniFile);
   mouseClickAnimation =
       GetPrivateProfileInt(L"KeyCastOW", L"mouseClickAnimation", 0, iniFile);
-  clickAnimRadius =
-      GetPrivateProfileInt(L"KeyCastOW", L"clickAnimRadius", 25, iniFile);
-  alignment = GetPrivateProfileInt(L"KeyCastOW", L"alignment", 1, iniFile);
+  clickAnimRadius = clampUnsignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"clickAnimRadius",
+                           CLICK_ANIM_DEFAULT_RADIUS, iniFile),
+      4, 200);
+  alignment = clampSignedValue(
+      GetPrivateProfileInt(L"KeyCastOW", L"alignment", 1, iniFile), 0, 1);
   onlyCommandKeys =
       GetPrivateProfileInt(L"KeyCastOW", L"onlyCommandKeys", 0, iniFile);
   draggableLabel =
       GetPrivateProfileInt(L"KeyCastOW", L"draggableLabel", 0, iniFile);
-  if (draggableLabel) {
-    SetWindowLong(hMainWnd, GWL_EXSTYLE,
-                  GetWindowLong(hMainWnd, GWL_EXSTYLE) & ~WS_EX_TRANSPARENT);
-  } else {
-    SetWindowLong(hMainWnd, GWL_EXSTYLE,
-                  GetWindowLong(hMainWnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
-  }
+  updateMainWindowTransparency();
   tcModifiers =
       GetPrivateProfileInt(L"KeyCastOW", L"tcModifiers", MOD_ALT, iniFile);
   tcKey = GetPrivateProfileInt(L"KeyCastOW", L"tcKey", 0x42, iniFile);
@@ -926,26 +980,27 @@ void loadSettings() {
 }
 void renderSettingsData(HWND hwndDlg) {
   WCHAR tmp[256];
-  swprintf(tmp, 256, L"%d", previewLabelSettings.keyStrokeDelay);
+  swprintf(tmp, 256, L"%lu",
+           (unsigned long)previewLabelSettings.keyStrokeDelay);
   SetDlgItemText(hwndDlg, IDC_KEYSTROKEDELAY, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.lingerTime);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.lingerTime);
   SetDlgItemText(hwndDlg, IDC_LINGERTIME, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.fadeDuration);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.fadeDuration);
   SetDlgItemText(hwndDlg, IDC_FADEDURATION, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.bgOpacity);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.bgOpacity);
   SetDlgItemText(hwndDlg, IDC_BGOPACITY, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.textOpacity);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.textOpacity);
   SetDlgItemText(hwndDlg, IDC_TEXTOPACITY, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.borderOpacity);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.borderOpacity);
   SetDlgItemText(hwndDlg, IDC_BORDEROPACITY, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.borderSize);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.borderSize);
   SetDlgItemText(hwndDlg, IDC_BORDERSIZE, tmp);
-  swprintf(tmp, 256, L"%d", previewLabelSettings.cornerSize);
+  swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.cornerSize);
   SetDlgItemText(hwndDlg, IDC_CORNERSIZE, tmp);
 
-  swprintf(tmp, 256, L"%d", labelSpacing);
+  swprintf(tmp, 256, L"%lu", (unsigned long)labelSpacing);
   SetDlgItemText(hwndDlg, IDC_LABELSPACING, tmp);
-  swprintf(tmp, 256, L"%d", maximumLines);
+  swprintf(tmp, 256, L"%lu", (unsigned long)maximumLines);
   SetDlgItemText(hwndDlg, IDC_MAXIMUMLINES, tmp);
   SetDlgItemText(hwndDlg, IDC_BRANDING, branding);
   SetDlgItemText(hwndDlg, IDC_COMBSCHEME, comboChars);
@@ -980,29 +1035,22 @@ void renderSettingsData(HWND hwndDlg) {
   ComboBox_SetCurSel(GetDlgItem(hwndDlg, IDC_ALIGNMENT), alignment);
 }
 void getLabelSettings(HWND hwndDlg, LabelSettings &lblSettings) {
-  WCHAR tmp[256];
-  GetDlgItemText(hwndDlg, IDC_KEYSTROKEDELAY, tmp, 256);
-  lblSettings.keyStrokeDelay = _wtoi(tmp);
-  GetDlgItemText(hwndDlg, IDC_LINGERTIME, tmp, 256);
-  lblSettings.lingerTime = _wtoi(tmp);
-  GetDlgItemText(hwndDlg, IDC_FADEDURATION, tmp, 256);
-  lblSettings.fadeDuration = _wtoi(tmp);
-  if (lblSettings.fadeDuration < SHOWTIMER_INTERVAL * 5) {
-    lblSettings.fadeDuration = SHOWTIMER_INTERVAL * 5;
-  }
-  GetDlgItemText(hwndDlg, IDC_BGOPACITY, tmp, 256);
-  lblSettings.bgOpacity = _wtoi(tmp);
-  lblSettings.bgOpacity = min(lblSettings.bgOpacity, 255);
-  GetDlgItemText(hwndDlg, IDC_TEXTOPACITY, tmp, 256);
-  lblSettings.textOpacity = _wtoi(tmp);
-  lblSettings.textOpacity = min(lblSettings.textOpacity, 255);
-  GetDlgItemText(hwndDlg, IDC_BORDEROPACITY, tmp, 256);
-  lblSettings.borderOpacity = _wtoi(tmp);
-  lblSettings.borderOpacity = min(lblSettings.borderOpacity, 255);
-  GetDlgItemText(hwndDlg, IDC_BORDERSIZE, tmp, 256);
-  lblSettings.borderSize = _wtoi(tmp);
-  GetDlgItemText(hwndDlg, IDC_CORNERSIZE, tmp, 256);
-  lblSettings.cornerSize = _wtoi(tmp);
+  lblSettings.keyStrokeDelay =
+      readDialogUnsignedValue(hwndDlg, IDC_KEYSTROKEDELAY, 0, 10000);
+  lblSettings.lingerTime =
+      readDialogUnsignedValue(hwndDlg, IDC_LINGERTIME, 0, 60000);
+  lblSettings.fadeDuration = readDialogUnsignedValue(
+      hwndDlg, IDC_FADEDURATION, SHOWTIMER_INTERVAL * 5, 60000);
+  lblSettings.bgOpacity =
+      readDialogUnsignedValue(hwndDlg, IDC_BGOPACITY, 0, 255);
+  lblSettings.textOpacity =
+      readDialogUnsignedValue(hwndDlg, IDC_TEXTOPACITY, 0, 255);
+  lblSettings.borderOpacity =
+      readDialogUnsignedValue(hwndDlg, IDC_BORDEROPACITY, 0, 255);
+  lblSettings.borderSize =
+      readDialogUnsignedValue(hwndDlg, IDC_BORDERSIZE, 0, 64);
+  lblSettings.cornerSize =
+      readDialogUnsignedValue(hwndDlg, IDC_CORNERSIZE, 0, 128);
 }
 DWORD previewTime = 0;
 #define PREVIEWTIMER_INTERVAL 5
@@ -1033,14 +1081,14 @@ static void previewLabel() {
   HDC memDC = ::CreateCompatibleDC(hdc);
   HBITMAP memBitmap =
       ::CreateCompatibleBitmap(hdc, (int)rc.Width, (int)rc.Height);
-  ::SelectObject(memDC, memBitmap);
+  HBITMAP oldBitmap = (HBITMAP)::SelectObject(memDC, memBitmap);
   Graphics g(memDC);
   g.SetSmoothingMode(SmoothingModeAntiAlias);
   g.SetTextRenderingHint(TextRenderingHintAntiAlias);
 
   WCHAR text[] = L"BH";
   HFONT hFont = CreateFontIndirect(&previewLabelSettings.font);
-  SelectObject(memDC, hFont);
+  HFONT oldFont = (HFONT)SelectObject(memDC, hFont);
   Font font(memDC, hFont);
 
   PointF origin(rc.X + previewLabelSettings.borderSize,
@@ -1062,8 +1110,11 @@ static void previewLabel() {
                  (REAL)previewLabelSettings.cornerSize);
   SolidBrush textBrushPlus(
       Color(BR(textAlpha, previewLabelSettings.textColor)));
-  g.DrawString(text, wcslen(text), &font, origin, &textBrushPlus);
+  INT previewTextLength = (INT)wcslen(text);
+  g.DrawString(text, previewTextLength, &font, origin, &textBrushPlus);
   BitBlt(hdc, rt.left, rt.top, rtWidth, rtHeight, memDC, 0, 0, SRCCOPY);
+  SelectObject(memDC, oldFont);
+  SelectObject(memDC, oldBitmap);
   DeleteDC(memDC);
   DeleteObject(memBitmap);
   DeleteObject(hFont);
@@ -1225,31 +1276,31 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
       cf.nSizeMax = 0;
 
       if (ChooseFont(&cf)) {
-        prepareLabels();
-        saveSettings();
+        previewTime = 0;
       }
     }
       return TRUE;
     case IDC_TEXTCOLOR:
       if (ColorDialog(hwndDlg, previewLabelSettings.textColor)) {
-        prepareLabels();
-        saveSettings();
+        previewTime = 0;
       }
       return TRUE;
     case IDC_BGCOLOR:
       if (ColorDialog(hwndDlg, previewLabelSettings.bgColor)) {
-        prepareLabels();
-        saveSettings();
+        previewTime = 0;
       }
       return TRUE;
     case IDC_BORDERCOLOR:
       if (ColorDialog(hwndDlg, previewLabelSettings.borderColor)) {
-        prepareLabels();
-        saveSettings();
+        previewTime = 0;
       }
       return TRUE;
     case IDC_POSITION: {
-      alignment = ComboBox_GetCurSel(GetDlgItem(hwndDlg, IDC_ALIGNMENT));
+      int selectedAlignment =
+          ComboBox_GetCurSel(GetDlgItem(hwndDlg, IDC_ALIGNMENT));
+      if (selectedAlignment != CB_ERR) {
+        alignment = selectedAlignment;
+      }
       clearColor.SetValue(0x7f7f7f7f);
       gCanvas->Clear(clearColor);
       showText(L"\u254b", 1);
@@ -1257,20 +1308,13 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
       positioning = TRUE;
     }
       return TRUE;
-    case IDOK:
+    case IDOK: {
       labelSettings = previewLabelSettings;
-      GetDlgItemText(hwndDlg, IDC_LABELSPACING, tmp, 256);
-      labelSpacing = _wtoi(tmp);
-      if (labelSpacing > (DWORD)(desktopRect.bottom - desktopRect.top) / 3) {
-        labelSpacing = (DWORD)(desktopRect.bottom - desktopRect.top) / 3;
-      }
-      GetDlgItemText(hwndDlg, IDC_MAXIMUMLINES, tmp, 256);
-      maximumLines = _wtoi(tmp);
-      if (maximumLines > MAXLABELS) {
-        maximumLines = MAXLABELS;
-      } else if (maximumLines == 0) {
-        maximumLines = 1;
-      }
+      labelSpacing = readDialogUnsignedValue(
+          hwndDlg, IDC_LABELSPACING, 0,
+          (DWORD)(desktopRect.bottom - desktopRect.top) / 3);
+      maximumLines =
+          readDialogUnsignedValue(hwndDlg, IDC_MAXIMUMLINES, 1, MAXLABELS);
       GetDlgItemText(hwndDlg, IDC_BRANDING, branding, BRANDINGMAX);
       GetDlgItemText(hwndDlg, IDC_COMBSCHEME, comboChars, 4);
       visibleShift =
@@ -1305,11 +1349,19 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
         tcModifiers |= MOD_WIN;
       }
       GetDlgItemText(hwndDlg, IDC_TCKEY, tmp, 256);
-      alignment = ComboBox_GetCurSel(GetDlgItem(hwndDlg, IDC_ALIGNMENT));
+      int selectedAlignment =
+          ComboBox_GetCurSel(GetDlgItem(hwndDlg, IDC_ALIGNMENT));
+      if (selectedAlignment != CB_ERR) {
+        alignment = selectedAlignment;
+      }
       if (tcModifiers != 0 && tmp[0] != '\0') {
-        tcKey = VkKeyScanEx(tmp[0], GetKeyboardLayout(0));
+        SHORT hotKey = VkKeyScanEx(tmp[0], GetKeyboardLayout(0));
+        if (hotKey != -1) {
+          tcKey = LOBYTE(hotKey);
+        }
         UnregisterHotKey(NULL, 1);
-        if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
+        if (hotKey == -1 ||
+            !RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
           MessageBox(
               NULL,
               I18N(L"Messages", L"UnableToRegisterHotkey",
@@ -1325,6 +1377,7 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
       EndDialog(hwndDlg, wParam);
       previewTimer.Stop();
       return TRUE;
+    }
     case IDCANCEL:
       EndDialog(hwndDlg, wParam);
       previewTimer.Stop();
@@ -1455,11 +1508,14 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
         ofn.hwndOwner = NULL;
         ofn.hInstance = hInstance;
         ofn.lpstrFile = recordFN;
-        ofn.nMaxFile = sizeof(recordFN);
+        ofn.nMaxFile = _countof(recordFN);
         ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST;
         if (GetOpenFileName(&ofn)) {
           unsigned long id = 1;
-          CreateThread(NULL, 0, replay, recordFN, 0, &id);
+          HANDLE replayThread = CreateThread(NULL, 0, replay, recordFN, 0, &id);
+          if (replayThread) {
+            CloseHandle(replayThread);
+          }
           ModifyMenu(hPopMenu, MENU_REPLAY, MF_STRING, MENU_REPLAY,
                      L"Stop re&play");
         }
@@ -1467,14 +1523,18 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
     } break;
 #endif
     case MENU_EXIT:
-      Shell_NotifyIcon(NIM_DELETE, &nid);
-      ExitProcess(0);
+      DestroyWindow(hWnd);
       break;
     default:
       break;
     }
   } break;
   case WM_DESTROY:
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+    if (hPopMenu) {
+      DestroyMenu(hPopMenu);
+      hPopMenu = NULL;
+    }
     PostQuitMessage(0);
     break;
   case WM_DISPLAYCHANGE: {
@@ -1606,15 +1666,22 @@ BOOL ExtractResource(DWORD resourceId, LPCWSTR outputFilename) {
       WriteFile(hFile, pResourceData, resourceSize, &bytesWritten, NULL);
   CloseHandle(hFile);
 
-  return result;
+  return result && bytesWritten == resourceSize;
 }
 
 int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                    int nWinMode) {
+  UNREFERENCED_PARAMETER(hPrevInst);
+  UNREFERENCED_PARAMETER(lpszArgs);
+  UNREFERENCED_PARAMETER(nWinMode);
+
   HANDLE hMutex =
       CreateMutexA(nullptr, FALSE, "F78854180B584C7680CCC6EB262D10DD");
   if (GetLastError() == ERROR_ALREADY_EXISTS) {
     MessageBoxA(nullptr, "Already Exist.", "Error", MB_OK | MB_ICONERROR);
+    if (hMutex) {
+      CloseHandle(hMutex);
+    }
     return -1;
   }
 
@@ -1726,6 +1793,8 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                     L"Could not register window class")
                    .c_str(),
                I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+    GdiplusShutdown(gdiplusToken);
+    CloseHandle(hMutex);
     return 0;
   }
 
@@ -1740,6 +1809,8 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
         I18N(L"Messages", L"CouldNotCreateWindow", L"Could not create window")
             .c_str(),
         I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+    GdiplusShutdown(gdiplusToken);
+    CloseHandle(hMutex);
     return 0;
   }
 
@@ -1759,17 +1830,33 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                              L"STAMP", WS_VISIBLE | WS_POPUP, 0, 0, 1, 1, NULL,
                              NULL, hThisInst, NULL);
 
-  MyRegisterClassEx(hThisInst, szClickAnimName, DefWindowProc);
-  for (int i = 0; i < CLICK_ANIM_MAX; i++) {
-    clickAnims[i].hWnd = CreateWindowEx(
-        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
-        szClickAnimName, szClickAnimName, WS_POPUP, 0, 0, 1, 1, NULL, NULL,
-        hThisInst, NULL);
-    clickAnims[i].active = FALSE;
-    clickAnims[i].frame = 0;
+  if (MyRegisterClassEx(hThisInst, szClickAnimName, DefWindowProc) ||
+      GetLastError() == ERROR_CLASS_ALREADY_EXISTS) {
+    clickAnimationAvailable = TRUE;
+    for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+      clickAnims[i].hWnd = CreateWindowEx(
+          WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+          szClickAnimName, szClickAnimName, WS_POPUP, 0, 0, 1, 1, NULL, NULL,
+          hThisInst, NULL);
+      clickAnims[i].active = FALSE;
+      clickAnims[i].frame = 0;
+      if (!clickAnims[i].hWnd) {
+        clickAnimationAvailable = FALSE;
+      }
+    }
   }
-  clickAnimTimer.OnTimedEvent = tickClickAnims;
-  clickAnimTimer.Start(CLICK_ANIM_INTERVAL);
+  if (!clickAnimationAvailable) {
+    mouseClickAnimation = FALSE;
+    for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+      if (clickAnims[i].hWnd) {
+        DestroyWindow(clickAnims[i].hWnd);
+        clickAnims[i].hWnd = NULL;
+      }
+    }
+  } else {
+    clickAnimTimer.OnTimedEvent = tickClickAnims;
+    clickAnimTimer.Start(CLICK_ANIM_INTERVAL);
+  }
 
   if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
     MessageBox(NULL,
@@ -1833,11 +1920,47 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
     }
   }
 
-  UnhookWindowsHookEx(kbdhook);
-  UnhookWindowsHookEx(moshook);
+  showTimer.Stop();
+  previewTimer.Stop();
+  clickAnimTimer.Stop();
+
+  if (kbdhook) {
+    UnhookWindowsHookEx(kbdhook);
+  }
+  if (moshook) {
+    UnhookWindowsHookEx(moshook);
+  }
   UnregisterHotKey(NULL, 1);
   delete gCanvas;
+  gCanvas = NULL;
   delete fontPlus;
+  fontPlus = NULL;
+  if (g_hdcBuffer) {
+    SelectObject(g_hdcBuffer, g_hBitmapOld);
+    DeleteObject(g_hbitmap);
+    DeleteDC(g_hdcBuffer);
+    g_hdcBuffer = NULL;
+    g_hbitmap = NULL;
+    g_hBitmapOld = NULL;
+  }
+  if (g_hlabelFont) {
+    DeleteObject(g_hlabelFont);
+    g_hlabelFont = NULL;
+  }
+  if (hWndStamp) {
+    DestroyWindow(hWndStamp);
+    hWndStamp = NULL;
+  }
+  if (hDlgSettings) {
+    DestroyWindow(hDlgSettings);
+    hDlgSettings = NULL;
+  }
+  for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+    if (clickAnims[i].hWnd) {
+      DestroyWindow(clickAnims[i].hWnd);
+      clickAnims[i].hWnd = NULL;
+    }
+  }
   DeleteObject(hlabelFont);
 #ifdef _DEBUG
   fclose(capStream);
@@ -1845,5 +1968,6 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
 #endif
 
   GdiplusShutdown(gdiplusToken);
-  return msg.wParam;
+  CloseHandle(hMutex);
+  return (int)msg.wParam;
 }

@@ -1,10 +1,10 @@
 // Copyright © 2014 Brook Hong. All Rights Reserved.
 
 #include <stdio.h>
-#include <stdlib.h>
 
 #include <windows.h>
 
+#include "click_animation.h"
 #include "keylog.h"
 
 struct Key {
@@ -150,22 +150,13 @@ extern BOOL keyAutoRepeat;
 extern BOOL mergeMouseActions;
 extern BOOL mouseClickAnimation;
 extern BOOL onlyCommandKeys;
-extern WCHAR comboChars[3];
+extern WCHAR comboChars[4];
 extern BOOL positioning;
 extern WCHAR deferredLabel[64];
 HHOOK kbdhook, moshook;
 void showText(LPCWSTR text, int behavior = 0);
-void fadeLastLabel(BOOL weither);
+void fadeLastLabel(BOOL whether);
 void positionOrigin(int action, POINT &pt);
-// Click animation types (must match keycast.cpp defines)
-#define CLICK_ANIM_LBUTTON     0
-#define CLICK_ANIM_RBUTTON     1
-#define CLICK_ANIM_MBUTTON     2
-#define CLICK_ANIM_XBUTTON1    3
-#define CLICK_ANIM_XBUTTON2    4
-#define CLICK_ANIM_SCROLL_UP   5
-#define CLICK_ANIM_SCROLL_DOWN 6
-void triggerClickAnimation(int x, int y, int type);
 
 #ifdef _DEBUG
 #include <sstream>
@@ -174,8 +165,7 @@ void log(const std::stringstream &line);
 LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
   static WCHAR symbol[32];
   BYTE btKeyState[256];
-  WORD Symbol = 0;
-  WCHAR cc[2];
+  WCHAR translated[5] = {0};
   if (mod) {
     ZeroMemory(btKeyState, sizeof(btKeyState));
   } else {
@@ -183,7 +173,8 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
       btKeyState[i] = (BYTE)GetKeyState(i);
     }
   }
-  int rr = ToUnicodeEx(vk, sc, btKeyState, cc, 2, 0, hklLayout);
+  int rr = ToUnicodeEx(vk, sc, btKeyState, translated,
+                       _countof(translated) - 1, 0, hklLayout);
 #ifdef _DEBUG
   WCHAR ss[KL_NAMELENGTH];
   GetKeyboardLayoutName(ss);
@@ -194,8 +185,10 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
   // log(line);
 #endif
   if (rr > 0) {
-    swprintf(symbol, 32, L"%s", cc);
-    symbol[rr] = L'\0';
+    size_t copied = (rr < (int)_countof(symbol)) ? (size_t)rr
+                                                 : _countof(symbol) - 1;
+    memcpy_s(symbol, sizeof(symbol), translated, copied * sizeof(WCHAR));
+    symbol[copied] = L'\0';
     return symbol;
   }
   return NULL;
@@ -441,7 +434,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
   WCHAR c[64] = L"\0";
   WCHAR tmp[64] = L"\0";
 
-  UINT idx = wp - WM_MOUSEFIRST;
+  UINT idx = (UINT)(wp - WM_MOUSEFIRST);
   int behavior = 1;
   static DWORD mouseButtonDown = 0;
   static DWORD lastClick = 0;
@@ -457,19 +450,25 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
     if (!(ms->flags & LLMHF_INJECTED)) {
       // Trigger click animation on mouse events
       if (mouseClickAnimation) {
-        int animType = -1;
-        if (idx == 1) animType = CLICK_ANIM_LBUTTON;
-        else if (idx == 4) animType = CLICK_ANIM_RBUTTON;
-        else if (idx == 7) animType = CLICK_ANIM_MBUTTON;
+        ClickAnimationType animType;
+        BOOL hasAnimation = TRUE;
+        if (idx == 1)
+          animType = CLICK_ANIM_LBUTTON;
+        else if (idx == 4)
+          animType = CLICK_ANIM_RBUTTON;
+        else if (idx == 7)
+          animType = CLICK_ANIM_MBUTTON;
         else if (idx == 11) {
-          WORD xButton = HIWORD(ms->mouseData);
+          WORD xButton = GET_XBUTTON_WPARAM(static_cast<WPARAM>(ms->mouseData));
           animType = (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
-        }
-        else if (idx == 10) {
-          short delta = (short)HIWORD(ms->mouseData);
+        } else if (idx == 10) {
+          short delta =
+              GET_WHEEL_DELTA_WPARAM(static_cast<WPARAM>(ms->mouseData));
           animType = (delta > 0) ? CLICK_ANIM_SCROLL_UP : CLICK_ANIM_SCROLL_DOWN;
+        } else {
+          hasAnimation = FALSE;
         }
-        if (animType >= 0) {
+        if (hasAnimation) {
           triggerClickAnimation(ms->pt.x, ms->pt.y, animType);
         }
       }
@@ -485,7 +484,10 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
         lastMouseAction[0] = '\0';
       }
       if (idx == 10) {
-        swprintf(c, 64, (int)(ms->mouseData) > 0 ? L"%sUp" : L"%sDown",
+        swprintf(c, 64,
+                 GET_WHEEL_DELTA_WPARAM(static_cast<WPARAM>(ms->mouseData)) > 0
+                     ? L"%sUp"
+                     : L"%sDown",
                  mouseActions[idx]);
         if (wcscmp(c, lastMouseAction) == 0) {
           fadeLastLabel(FALSE);

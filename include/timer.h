@@ -22,6 +22,7 @@ public:
   CTimer() {
     m_hTimer = NULL;
     m_mutexCount = 0;
+    OnTimedEvent = NULL;
   }
 
   virtual ~CTimer() { Stop(); }
@@ -46,7 +47,7 @@ public:
 
   void Stop() {
     if (m_hTimer) {
-      DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
+      DeleteTimerQueueTimer(NULL, m_hTimer, INVALID_HANDLE_VALUE);
       m_hTimer = NULL;
     }
   }
@@ -69,13 +70,21 @@ private:
 // TimerProc
 //
 static void CALLBACK TimerProc(void *param, BOOLEAN timerCalled) {
+  UNREFERENCED_PARAMETER(timerCalled);
   CTimer *timer = static_cast<CTimer *>(param);
+  if (!timer || !timer->OnTimedEvent) {
+    return;
+  }
   timer->SetCount(timer->GetCount() + 1);
   timer->OnTimedEvent();
 };
 
 static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled) {
+  UNREFERENCED_PARAMETER(timerCalled);
   CTimer *timer = static_cast<CTimer *>(param);
+  if (!timer || !timer->OnTimedEvent) {
+    return;
+  }
   timer->SetCount(timer->GetCount() + 1);
   timer->OnTimedEvent();
 };
