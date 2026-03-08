@@ -1,0 +1,4 @@
+#pragma once
+
+#define KEYCASTOW_VERSION_NUMBERS 2, 1, 1, 0
+#define KEYCASTOW_VERSION_STRING "2.1.1.0"

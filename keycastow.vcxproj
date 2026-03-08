@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\resource.h" />
+    <ClInclude Include="include\version.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\keycastow.rc" />
