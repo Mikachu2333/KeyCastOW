@@ -38,9 +38,15 @@ struct KeyLabel {
   DWORD length;
   int time;
   BOOL fade;
+  DWORD holdVk;
+  BOOL held;
   KeyLabel() {
     text = textBuffer;
     length = 0;
+    time = 0;
+    fade = TRUE;
+    holdVk = 0;
+    held = FALSE;
   }
 };
 
@@ -477,7 +483,41 @@ void updateLabel(int i) {
   }
 }
 
-void fadeLastLabel(BOOL whether) { keyLabels[labelCount - 1].fade = whether; }
+void fadeLastLabel(BOOL whether) {
+  if (labelCount == 0) {
+    return;
+  }
+  keyLabels[labelCount - 1].fade = whether;
+}
+
+BOOL isHeldKeyLabel(DWORD vkCode) {
+  for (DWORD i = 0; i < labelCount; i++) {
+    if (keyLabels[i].held && keyLabels[i].holdVk == vkCode) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+void holdLastLabelForKey(DWORD vkCode) {
+  if (labelCount == 0) {
+    return;
+  }
+  keyLabels[labelCount - 1].fade = FALSE;
+  keyLabels[labelCount - 1].holdVk = vkCode;
+  keyLabels[labelCount - 1].held = TRUE;
+}
+
+void releaseHeldLabelForKey(DWORD vkCode) {
+  for (DWORD i = 0; i < labelCount; i++) {
+    if (keyLabels[i].held && keyLabels[i].holdVk == vkCode) {
+      keyLabels[i].held = FALSE;
+      keyLabels[i].holdVk = 0;
+      keyLabels[i].fade = TRUE;
+      return;
+    }
+  }
+}
 
 static int newStrokeCount = 0;
 #define SHOWTIMER_INTERVAL 40
@@ -607,6 +647,8 @@ void showText(LPCWSTR text, int behavior = 0) {
       keyLabels[i - 1].time = keyLabels[i].time;
       keyLabels[i - 1].rect.X = keyLabels[i].rect.X;
       keyLabels[i - 1].fade = TRUE;
+      keyLabels[i - 1].holdVk = keyLabels[i].holdVk;
+      keyLabels[i - 1].held = keyLabels[i].held;
       updateLabel(i - 1);
       eraseLabel(i);
     }
@@ -634,6 +676,8 @@ void showText(LPCWSTR text, int behavior = 0) {
     ensureSpace(tmp, newLen);
     wcscpy_s(tmp, (textBufferEnd - tmp), text);
   }
+  keyLabels[labelCount - 1].holdVk = 0;
+  keyLabels[labelCount - 1].held = FALSE;
   keyLabels[labelCount - 1].time =
       labelSettings.lingerTime + labelSettings.fadeDuration;
   keyLabels[labelCount - 1].fade = TRUE;

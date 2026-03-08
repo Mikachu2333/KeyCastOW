@@ -156,6 +156,9 @@ extern WCHAR deferredLabel[64];
 HHOOK kbdhook, moshook;
 void showText(LPCWSTR text, int behavior = 0);
 void fadeLastLabel(BOOL whether);
+BOOL isHeldKeyLabel(DWORD vkCode);
+void holdLastLabelForKey(DWORD vkCode);
+void releaseHeldLabelForKey(DWORD vkCode);
 void positionOrigin(int action, POINT &pt);
 
 #ifdef _DEBUG
@@ -349,7 +352,11 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
     inAltGrMiddle = TRUE;
   } else if (wp == WM_KEYUP || wp == WM_SYSKEYUP) {
     lastvk = 0;
-    fadeLastLabel(TRUE);
+    if (!keyAutoRepeat) {
+      releaseHeldLabelForKey(k.vkCode);
+    } else {
+      fadeLastLabel(TRUE);
+    }
     BOOL isAltGr = inAltGrMiddle && k.vkCode == VK_RMENU && wp == WM_KEYUP;
     inAltGrMiddle = FALSE;
     if (isAltGr) {
@@ -365,10 +372,10 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
     // will be a WM_SYSKEYDOWN for VK_RMENU.
     inAltGrMiddle = TRUE;
   } else if (wp == WM_KEYDOWN || wp == WM_SYSKEYDOWN) {
-    if (!keyAutoRepeat && lastvk == k.vkCode) {
-      fadeLastLabel(FALSE);
+    if (!keyAutoRepeat && isHeldKeyLabel(k.vkCode)) {
       return TRUE;
     }
+    BOOL displayedKey = FALSE;
     int fin = 0;
     // AltGr is WM_SYSKEYDOWN + VK_LCONTROL followed by WM_SYSKEYDOWN +
     // VK_RMENU, then WM_KEYUP + VK_LCONTROL and WM_KEYUP + VK_RMENU when
@@ -394,6 +401,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
         } else {
           showText(c, 1);
         }
+        displayedKey = TRUE;
       }
     } else {
       WORD a = 0;
@@ -421,10 +429,14 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
         }
         if (fin || !onlyCommandKeys) {
           showText(theKey, fin);
+          displayedKey = TRUE;
         }
       }
     }
     lastvk = k.vkCode;
+    if (!keyAutoRepeat && displayedKey) {
+      holdLastLabelForKey(k.vkCode);
+    }
   }
 
   return CallNextHookEx(kbdhook, nCode, wp, lp);
