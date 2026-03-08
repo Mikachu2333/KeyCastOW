@@ -173,8 +173,8 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
       btKeyState[i] = (BYTE)GetKeyState(i);
     }
   }
-  int rr = ToUnicodeEx(vk, sc, btKeyState, translated,
-                       _countof(translated) - 1, 0, hklLayout);
+  int rr = ToUnicodeEx(vk, sc, btKeyState, translated, _countof(translated) - 1,
+                       0, hklLayout);
 #ifdef _DEBUG
   WCHAR ss[KL_NAMELENGTH];
   GetKeyboardLayoutName(ss);
@@ -185,8 +185,8 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
   // log(line);
 #endif
   if (rr > 0) {
-    size_t copied = (rr < (int)_countof(symbol)) ? (size_t)rr
-                                                 : _countof(symbol) - 1;
+    size_t copied =
+        (rr < (int)_countof(symbol)) ? (size_t)rr : _countof(symbol) - 1;
     memcpy_s(symbol, sizeof(symbol), translated, copied * sizeof(WCHAR));
     symbol[copied] = L'\0';
     return symbol;
@@ -470,7 +470,8 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
           animType = CLICK_ANIM_MBUTTON;
         else if (idx == 11) {
           WORD xButton = GET_XBUTTON_WPARAM(static_cast<WPARAM>(ms->mouseData));
-          animType = (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
+          animType =
+              (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
         } else if (idx == 10) {
           animType = (wheelAnimDirection > 0) ? CLICK_ANIM_SCROLL_UP
                                               : CLICK_ANIM_SCROLL_DOWN;
