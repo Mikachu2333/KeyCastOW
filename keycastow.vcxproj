@@ -24,8 +24,8 @@
     <ClCompile Include="src\keylog.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\resource.h" />
     <ClInclude Include="include\version.h" />
+    <ClInclude Include="include\resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\keycastow.rc" />

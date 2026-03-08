@@ -1,4 +1,5 @@
-// Copyright © 2015 - 2026 Brook Hong && Mikachu2333. MIT LICENSE. All Rights Reserved.
+// Copyright © 2015 - 2026 Brook Hong && Mikachu2333. MIT LICENSE. All Rights
+// Reserved.
 //
 
 // msbuild /p:platform=win32 /p:Configuration=Release
@@ -60,6 +61,7 @@ BOOL mouseCapturing = TRUE;
 BOOL mouseCapturingMod = FALSE;
 BOOL keyAutoRepeat = TRUE;
 BOOL mergeMouseActions = TRUE;
+BOOL mouseClickAnimation = FALSE;
 int alignment = 1;
 BOOL onlyCommandKeys = FALSE;
 BOOL positioning = FALSE;
@@ -71,6 +73,32 @@ Color clearColor(0, 127, 127, 127);
 WCHAR branding[BRANDINGMAX];
 WCHAR comboChars[4];
 POINT deskOrigin;
+
+// Click animation
+#define CLICK_ANIM_MAX 5
+#define CLICK_ANIM_INTERVAL 16
+#define CLICK_ANIM_FRAMES 18
+DWORD clickAnimRadius = 25;
+
+// Click animation types
+#define CLICK_ANIM_LBUTTON 0
+#define CLICK_ANIM_RBUTTON 1
+#define CLICK_ANIM_MBUTTON 2
+#define CLICK_ANIM_XBUTTON1 3
+#define CLICK_ANIM_XBUTTON2 4
+#define CLICK_ANIM_SCROLL_UP 5
+#define CLICK_ANIM_SCROLL_DOWN 6
+
+struct ClickAnim {
+  HWND hWnd;
+  int frame;
+  BOOL active;
+  int type;
+  int centerX, centerY;
+};
+ClickAnim clickAnims[CLICK_ANIM_MAX];
+CTimer clickAnimTimer;
+WCHAR *szClickAnimName = L"KeyCastOWClickAnim";
 
 #define MAXLABELS 60
 KeyLabel keyLabels[MAXLABELS];
@@ -211,6 +239,121 @@ void updateLayeredWindow(HWND hwnd) {
                         0, &blendFunction, 2);
   ReleaseDC(hwnd, hdc);
   gCanvas->ReleaseHDC(hdcBuf);
+}
+void renderClickAnim(ClickAnim &anim) {
+  REAL progress = (REAL)anim.frame / CLICK_ANIM_FRAMES;
+  int alpha = (int)(200 * (1.0f - progress));
+  if (alpha < 0)
+    alpha = 0;
+
+  int wndSize = clickAnimRadius * 2 + 8;
+  REAL cx = wndSize / 2.0f, cy = wndSize / 2.0f;
+  REAL r = clickAnimRadius * (0.3f + 0.7f * progress);
+
+  HDC hdc = GetDC(anim.hWnd);
+  HDC memDC = ::CreateCompatibleDC(hdc);
+  HBITMAP memBitmap = ::CreateCompatibleBitmap(hdc, wndSize, wndSize);
+  HBITMAP hOldBitmap = (HBITMAP)::SelectObject(memDC, memBitmap);
+  Graphics g(memDC);
+  g.SetSmoothingMode(SmoothingModeAntiAlias);
+  g.Clear(Color(0, 0, 0, 0));
+
+  switch (anim.type) {
+  case CLICK_ANIM_LBUTTON: {
+    SolidBrush brush(Color((BYTE)alpha, 255, 80, 80));
+    g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, 90, 180);
+    break;
+  }
+  case CLICK_ANIM_RBUTTON: {
+    SolidBrush brush(Color((BYTE)alpha, 80, 130, 255));
+    g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, -90, 180);
+    break;
+  }
+  case CLICK_ANIM_MBUTTON: {
+    SolidBrush brush(Color((BYTE)alpha, 80, 200, 80));
+    g.FillEllipse(&brush, cx - r, cy - r, r * 2, r * 2);
+    break;
+  }
+  case CLICK_ANIM_XBUTTON1: {
+    SolidBrush brush(Color((BYTE)alpha, 255, 180, 50));
+    g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, 180, 180);
+    break;
+  }
+  case CLICK_ANIM_XBUTTON2: {
+    SolidBrush brush(Color((BYTE)alpha, 255, 180, 50));
+    g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, 0, 180);
+    break;
+  }
+  case CLICK_ANIM_SCROLL_UP: {
+    SolidBrush brush(Color((BYTE)alpha, 100, 200, 255));
+    REAL sz = r;
+    PointF pts[3] = {PointF(cx, cy - sz),
+                     PointF(cx - sz * 0.7f, cy + sz * 0.3f),
+                     PointF(cx + sz * 0.7f, cy + sz * 0.3f)};
+    g.FillPolygon(&brush, pts, 3);
+    break;
+  }
+  case CLICK_ANIM_SCROLL_DOWN: {
+    SolidBrush brush(Color((BYTE)alpha, 100, 200, 255));
+    REAL sz = r;
+    PointF pts[3] = {PointF(cx, cy + sz),
+                     PointF(cx - sz * 0.7f, cy - sz * 0.3f),
+                     PointF(cx + sz * 0.7f, cy - sz * 0.3f)};
+    g.FillPolygon(&brush, pts, 3);
+    break;
+  }
+  }
+
+  // Always center window on the click point
+  POINT ptSrc = {0, 0};
+  POINT ptDst = {anim.centerX - wndSize / 2, anim.centerY - wndSize / 2};
+  SIZE sz = {wndSize, wndSize};
+  BLENDFUNCTION bf;
+  bf.AlphaFormat = AC_SRC_ALPHA;
+  bf.BlendFlags = 0;
+  bf.BlendOp = AC_SRC_OVER;
+  bf.SourceConstantAlpha = 255;
+  ::UpdateLayeredWindow(anim.hWnd, hdc, &ptDst, &sz, memDC, &ptSrc, 0, &bf, 2);
+
+  ::SelectObject(memDC, hOldBitmap);
+  ::DeleteObject(memBitmap);
+  ::DeleteDC(memDC);
+  ReleaseDC(anim.hWnd, hdc);
+}
+static void tickClickAnims() {
+  for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+    if (clickAnims[i].active) {
+      clickAnims[i].frame++;
+      if (clickAnims[i].frame >= CLICK_ANIM_FRAMES) {
+        clickAnims[i].active = FALSE;
+        ShowWindow(clickAnims[i].hWnd, SW_HIDE);
+      } else {
+        renderClickAnim(clickAnims[i]);
+      }
+    }
+  }
+}
+void triggerClickAnimation(int x, int y, int type) {
+  int slot = -1;
+  for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+    if (!clickAnims[i].active) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0)
+    slot = 0; // reuse oldest
+
+  int wndSize = clickAnimRadius * 2 + 8;
+  clickAnims[slot].frame = 0;
+  clickAnims[slot].active = TRUE;
+  clickAnims[slot].type = type;
+  clickAnims[slot].centerX = x;
+  clickAnims[slot].centerY = y;
+  SetWindowPos(clickAnims[slot].hWnd, HWND_TOPMOST, x - wndSize / 2,
+               y - wndSize / 2, wndSize, wndSize,
+               SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  renderClickAnim(clickAnims[slot]);
 }
 void eraseLabel(int i) {
   RectF &rt = keyLabels[i].rect;
@@ -668,6 +811,8 @@ void saveSettings() {
   writeSettingInt(L"mouseCapturingMod", mouseCapturingMod);
   writeSettingInt(L"keyAutoRepeat", keyAutoRepeat);
   writeSettingInt(L"mergeMouseActions", mergeMouseActions);
+  writeSettingInt(L"mouseClickAnimation", mouseClickAnimation);
+  writeSettingInt(L"clickAnimRadius", clickAnimRadius);
   writeSettingInt(L"alignment", alignment);
   writeSettingInt(L"onlyCommandKeys", onlyCommandKeys);
   writeSettingInt(L"draggableLabel", draggableLabel);
@@ -742,6 +887,10 @@ void loadSettings() {
       GetPrivateProfileInt(L"KeyCastOW", L"keyAutoRepeat", 1, iniFile);
   mergeMouseActions =
       GetPrivateProfileInt(L"KeyCastOW", L"mergeMouseActions", 1, iniFile);
+  mouseClickAnimation =
+      GetPrivateProfileInt(L"KeyCastOW", L"mouseClickAnimation", 0, iniFile);
+  clickAnimRadius =
+      GetPrivateProfileInt(L"KeyCastOW", L"clickAnimRadius", 25, iniFile);
   alignment = GetPrivateProfileInt(L"KeyCastOW", L"alignment", 1, iniFile);
   onlyCommandKeys =
       GetPrivateProfileInt(L"KeyCastOW", L"onlyCommandKeys", 0, iniFile);
@@ -812,6 +961,8 @@ void renderSettingsData(HWND hwndDlg) {
                  keyAutoRepeat ? BST_CHECKED : BST_UNCHECKED);
   CheckDlgButton(hwndDlg, IDC_MERGEMOUSEACTIONS,
                  mergeMouseActions ? BST_CHECKED : BST_UNCHECKED);
+  CheckDlgButton(hwndDlg, IDC_MOUSECLICKANIMATION,
+                 mouseClickAnimation ? BST_CHECKED : BST_UNCHECKED);
   CheckDlgButton(hwndDlg, IDC_ONLYCOMMANDKEYS,
                  onlyCommandKeys ? BST_CHECKED : BST_UNCHECKED);
   CheckDlgButton(hwndDlg, IDC_DRAGGABLELABEL,
@@ -1004,6 +1155,10 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
         I18N(L"Settings", L"DetectClickDblClick", L"Detect Click/DblClick:")
             .c_str());
     SetDlgItemText(
+        hwndDlg, IDC_STATIC_MOUSECLICKANIMATION,
+        I18N(L"Settings", L"MouseClickAnimation", L"Mouse Click Animation:")
+            .c_str());
+    SetDlgItemText(
         hwndDlg, IDC_STATIC_BGOPACITY,
         I18N(L"Settings", L"BackgroundOpacity", L"Background Opacity(0-255):")
             .c_str());
@@ -1130,6 +1285,8 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_KEYAUTOREPEAT));
       mergeMouseActions =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MERGEMOUSEACTIONS));
+      mouseClickAnimation =
+          (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MOUSECLICKANIMATION));
       onlyCommandKeys =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_ONLYCOMMANDKEYS));
       draggableLabel =
@@ -1601,6 +1758,18 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   hWndStamp = CreateWindowEx(WS_EX_LAYERED | WS_EX_NOACTIVATE, L"STAMP",
                              L"STAMP", WS_VISIBLE | WS_POPUP, 0, 0, 1, 1, NULL,
                              NULL, hThisInst, NULL);
+
+  MyRegisterClassEx(hThisInst, szClickAnimName, DefWindowProc);
+  for (int i = 0; i < CLICK_ANIM_MAX; i++) {
+    clickAnims[i].hWnd = CreateWindowEx(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+        szClickAnimName, szClickAnimName, WS_POPUP, 0, 0, 1, 1, NULL, NULL,
+        hThisInst, NULL);
+    clickAnims[i].active = FALSE;
+    clickAnims[i].frame = 0;
+  }
+  clickAnimTimer.OnTimedEvent = tickClickAnims;
+  clickAnimTimer.Start(CLICK_ANIM_INTERVAL);
 
   if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
     MessageBox(NULL,

@@ -148,6 +148,7 @@ extern BOOL mouseCapturing;
 extern BOOL mouseCapturingMod;
 extern BOOL keyAutoRepeat;
 extern BOOL mergeMouseActions;
+extern BOOL mouseClickAnimation;
 extern BOOL onlyCommandKeys;
 extern WCHAR comboChars[3];
 extern BOOL positioning;
@@ -156,6 +157,15 @@ HHOOK kbdhook, moshook;
 void showText(LPCWSTR text, int behavior = 0);
 void fadeLastLabel(BOOL weither);
 void positionOrigin(int action, POINT &pt);
+// Click animation types (must match keycast.cpp defines)
+#define CLICK_ANIM_LBUTTON     0
+#define CLICK_ANIM_RBUTTON     1
+#define CLICK_ANIM_MBUTTON     2
+#define CLICK_ANIM_XBUTTON1    3
+#define CLICK_ANIM_XBUTTON2    4
+#define CLICK_ANIM_SCROLL_UP   5
+#define CLICK_ANIM_SCROLL_DOWN 6
+void triggerClickAnimation(int x, int y, int type);
 
 #ifdef _DEBUG
 #include <sstream>
@@ -445,6 +455,32 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
     MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
 
     if (!(ms->flags & LLMHF_INJECTED)) {
+      // Trigger click animation on mouse events
+      if (mouseClickAnimation) {
+        int animType = -1;
+        if (idx == 1) animType = CLICK_ANIM_LBUTTON;
+        else if (idx == 4) animType = CLICK_ANIM_RBUTTON;
+        else if (idx == 7) animType = CLICK_ANIM_MBUTTON;
+        else if (idx == 11) {
+          WORD xButton = HIWORD(ms->mouseData);
+          animType = (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
+        }
+        else if (idx == 10) {
+          short delta = (short)HIWORD(ms->mouseData);
+          animType = (delta > 0) ? CLICK_ANIM_SCROLL_UP : CLICK_ANIM_SCROLL_DOWN;
+        }
+        if (animType >= 0) {
+          triggerClickAnimation(ms->pt.x, ms->pt.y, animType);
+        }
+      }
+
+      // When mouseClickAnimation is on and no modifier is held, skip text log
+      if (mouseClickAnimation &&
+          !(isAnyModifierDown(modifierState) || modifierState.shift ||
+            modifierState.altGr)) {
+        return CallNextHookEx(moshook, nCode, wp, lp);
+      }
+
       if (idx != 10) {
         lastMouseAction[0] = '\0';
       }
