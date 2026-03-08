@@ -17,6 +17,10 @@ A keystroke and mouse action visualizer for Windows. Shows your keystrokes and m
 - Draggable label positioning
 - Single-instance enforcement
 
+## Videos
+
+![example](./example.webp)
+
 ## Build
 
 Requires MSBuild (Visual Studio Build Tools).
