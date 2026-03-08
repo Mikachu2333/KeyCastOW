@@ -438,6 +438,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
   int behavior = 1;
   static DWORD mouseButtonDown = 0;
   static DWORD lastClick = 0;
+  static int lastWheelAnimDirection = 0;
   static WCHAR lastMouseAction[64] = L"\0";
   BOOL holdButton = FALSE;
   if (positioning) {
@@ -448,6 +449,15 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
     MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
 
     if (!(ms->flags & LLMHF_INJECTED)) {
+      int wheelAnimDirection = 0;
+      if (idx == 10) {
+        wheelAnimDirection =
+            GET_WHEEL_DELTA_WPARAM(static_cast<WPARAM>(ms->mouseData)) > 0 ? 1
+                                                                           : -1;
+      } else {
+        lastWheelAnimDirection = 0;
+      }
+
       // Trigger click animation on mouse events
       if (mouseClickAnimation) {
         ClickAnimationType animType;
@@ -462,15 +472,18 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
           WORD xButton = GET_XBUTTON_WPARAM(static_cast<WPARAM>(ms->mouseData));
           animType = (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
         } else if (idx == 10) {
-          short delta =
-              GET_WHEEL_DELTA_WPARAM(static_cast<WPARAM>(ms->mouseData));
-          animType = (delta > 0) ? CLICK_ANIM_SCROLL_UP : CLICK_ANIM_SCROLL_DOWN;
+          animType = (wheelAnimDirection > 0) ? CLICK_ANIM_SCROLL_UP
+                                              : CLICK_ANIM_SCROLL_DOWN;
+          hasAnimation = (wheelAnimDirection != lastWheelAnimDirection);
         } else {
           hasAnimation = FALSE;
         }
         if (hasAnimation) {
           triggerClickAnimation(ms->pt.x, ms->pt.y, animType);
         }
+      }
+      if (wheelAnimDirection != 0) {
+        lastWheelAnimDirection = wheelAnimDirection;
       }
 
       // When mouseClickAnimation is on and no modifier is held, skip text log

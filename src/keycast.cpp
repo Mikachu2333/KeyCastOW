@@ -974,7 +974,8 @@ void loadSettings() {
   labelSettings.font.lfOutPrecision = OUT_DEFAULT_PRECIS;
   labelSettings.font.lfClipPrecision = CLIP_DEFAULT_PRECIS;
   labelSettings.font.lfQuality = ANTIALIASED_QUALITY;
-  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE, TEXT("Microsoft YaHei"));
+  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE,
+           TEXT("Microsoft YaHei UI"));
   GetPrivateProfileStruct(L"KeyCastOW", L"labelFont", &labelSettings.font,
                           sizeof(labelSettings.font), iniFile);
 }
@@ -1055,7 +1056,7 @@ void getLabelSettings(HWND hwndDlg, LabelSettings &lblSettings) {
 DWORD previewTime = 0;
 #define PREVIEWTIMER_INTERVAL 5
 static void previewLabel() {
-  RECT rt = {12, 58, 222, 238};
+  RECT rt = {12, 58, 222, 218};
 
   getLabelSettings(hDlgSettings, previewLabelSettings);
   DWORD mg =
@@ -1875,7 +1876,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   HFONT hlabelFont =
       CreateFont(20, 10, 0, 0, FW_BLACK, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                  OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-                 VARIABLE_PITCH, TEXT("Arial"));
+                 VARIABLE_PITCH, TEXT("Microsoft YaHei UI"));
   HWND hlink = GetDlgItem(hDlgSettings, IDC_SYSLINK1);
   SendMessage(hlink, WM_SETFONT, (WPARAM)hlabelFont, TRUE);
 
