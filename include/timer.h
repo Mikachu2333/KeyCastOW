@@ -47,7 +47,7 @@ public:
 
   void Stop() {
     if (m_hTimer) {
-      DeleteTimerQueueTimer(NULL, m_hTimer, INVALID_HANDLE_VALUE);
+      DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
       m_hTimer = NULL;
     }
   }
