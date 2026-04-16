@@ -1,4 +1,4 @@
-// Copyright © 2014 Brook Hong. All Rights Reserved.
+// Copyright © 2014-2026 Brook Hong && Mikachu2333. All Rights Reserved.
 
 #include <stdio.h>
 

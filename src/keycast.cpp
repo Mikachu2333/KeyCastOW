@@ -1042,6 +1042,8 @@ void renderSettingsData(HWND hwndDlg) {
   SetDlgItemText(hwndDlg, IDC_BORDERSIZE, tmp);
   swprintf(tmp, 256, L"%lu", (unsigned long)previewLabelSettings.cornerSize);
   SetDlgItemText(hwndDlg, IDC_CORNERSIZE, tmp);
+  swprintf(tmp, 256, L"%lu", (unsigned long)clickAnimRadius);
+  SetDlgItemText(hwndDlg, IDC_CLICKANIMRADIUS, tmp);
 
   swprintf(tmp, 256, L"%lu", (unsigned long)labelSpacing);
   SetDlgItemText(hwndDlg, IDC_LABELSPACING, tmp);
@@ -1257,6 +1259,11 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
         I18N(L"Settings", L"MouseClickAnimation", L"Mouse Click Animation:")
             .c_str());
     SetDlgItemText(
+      hwndDlg, IDC_STATIC_CLICKANIMRADIUS,
+      I18N(L"Settings", L"MouseClickAnimationSize",
+         L"Mouse Animation Size(4-200):")
+        .c_str());
+    SetDlgItemText(
         hwndDlg, IDC_STATIC_BGOPACITY,
         I18N(L"Settings", L"BackgroundOpacity", L"Background Opacity(0-255):")
             .c_str());
@@ -1378,6 +1385,8 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MERGEMOUSEACTIONS));
       mouseClickAnimation =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MOUSECLICKANIMATION));
+        clickAnimRadius =
+          readDialogUnsignedValue(hwndDlg, IDC_CLICKANIMRADIUS, 4, 200);
       onlyCommandKeys =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_ONLYCOMMANDKEYS));
       draggableLabel =
