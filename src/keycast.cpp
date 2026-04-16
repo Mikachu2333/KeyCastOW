@@ -2,8 +2,8 @@
 // Reserved.
 //
 
-// msbuild /p:platform=win32 /p:Configuration=Release
-// msbuild /p:platform=x64 /p:Configuration=Release
+// msbuild ./keycastow.sln /p:platform=x86 /p:Configuration=Release
+// msbuild ./keycastow.sln /p:platform=x64 /p:Configuration=Release
 
 #include <stdio.h>
 #include <windows.h>
@@ -1258,11 +1258,10 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
         hwndDlg, IDC_STATIC_MOUSECLICKANIMATION,
         I18N(L"Settings", L"MouseClickAnimation", L"Mouse Click Animation:")
             .c_str());
-    SetDlgItemText(
-      hwndDlg, IDC_STATIC_CLICKANIMRADIUS,
-      I18N(L"Settings", L"MouseClickAnimationSize",
-         L"Mouse Animation Size(4-200):")
-        .c_str());
+    SetDlgItemText(hwndDlg, IDC_STATIC_CLICKANIMRADIUS,
+                   I18N(L"Settings", L"MouseClickAnimationSize",
+                        L"Mouse Animation Size(4-200):")
+                       .c_str());
     SetDlgItemText(
         hwndDlg, IDC_STATIC_BGOPACITY,
         I18N(L"Settings", L"BackgroundOpacity", L"Background Opacity(0-255):")
@@ -1385,7 +1384,7 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MERGEMOUSEACTIONS));
       mouseClickAnimation =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_MOUSECLICKANIMATION));
-        clickAnimRadius =
+      clickAnimRadius =
           readDialogUnsignedValue(hwndDlg, IDC_CLICKANIMRADIUS, 4, 200);
       onlyCommandKeys =
           (BST_CHECKED == IsDlgButtonChecked(hwndDlg, IDC_ONLYCOMMANDKEYS));
