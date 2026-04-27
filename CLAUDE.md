@@ -20,11 +20,11 @@ A portable Windows keystroke/mouse visualizer — single executable, no installe
 
 ### Source layout
 
-| File | Purpose |
-|---|---|
-| [src/keycast.cpp](src/keycast.cpp) | Application entry point (`WinMain`), main overlay window, settings dialog, GDI+ label rendering, settings load/save, drag positioning, click animation rendering, crash dump handler |
-| [src/keylog.cpp](src/keylog.cpp) | Low-level keyboard hook (`LLKeyboardProc`) and mouse hook (`LLMouseProc`), key-to-symbol translation via `ToUnicodeEx`, modifier state tracking, mouse click merge/double-click detection |
-| [include/timer.h](include/timer.h) | `CTimer` — thin wrapper around Windows `CreateTimerQueueTimer` with a callback function pointer (`OnTimedEvent`) |
+| File                               | Purpose                                                                                                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [src/keycast.cpp](src/keycast.cpp) | Application entry point (`WinMain`), main overlay window, settings dialog, GDI+ label rendering, settings load/save, drag positioning, click animation rendering, crash dump handler      |
+| [src/keylog.cpp](src/keylog.cpp)   | Low-level keyboard hook (`LLKeyboardProc`) and mouse hook (`LLMouseProc`), key-to-symbol translation via `ToUnicodeEx`, modifier state tracking, mouse click merge/double-click detection |
+| [include/timer.h](include/timer.h) | `CTimer` — thin wrapper around Windows `CreateTimerQueueTimer` with a callback function pointer (`OnTimedEvent`)                                                                          |
 
 The project `.vcxproj` lists source files explicitly. Headers in `include/` are included via the `AdditionalIncludeDirectories` build setting.
 
