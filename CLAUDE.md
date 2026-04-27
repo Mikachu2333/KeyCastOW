@@ -83,7 +83,7 @@ All app state is module-level globals shared between keycast.cpp and keylog.cpp 
 
 ### Localization
 
-The `I18N(section, key, default)` macro (in [locale_manager.h](include/locale_manager.h)) resolves UI strings at runtime. Language `.ini` files are UTF-8 with BOM, parsed by `LocaleManager`. The app auto-detects language via `GetUserDefaultUILanguage()` and falls back to `keycastow_en.ini`. Embedded resources (`IDR_INI_DEFAULT`, `IDR_INI_EN`, `IDR_INI_ZH`) are extracted to disk on first run if missing.
+The `I18N(section, key, default)` macro (in [locale_manager.hpp](include/locale_manager.hpp)) resolves UI strings at runtime. Locale data is baked into the binary as `inline const LocaleMap` key-value maps in [locale_data.hpp](include/locale_data.hpp). The app auto-detects language via `GetUserDefaultUILanguage()` and loads the appropriate map with `LocaleManager::SetData()`. The settings `.ini` file is generated from program defaults on first run — no resources are extracted to disk.
 
 ## Linting / Formatting
 

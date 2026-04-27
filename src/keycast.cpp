@@ -73,7 +73,7 @@ BOOL mergeMouseActions = TRUE;
 BOOL mouseClickAnimation = TRUE;
 int alignment = 1;
 BOOL onlyCommandKeys = FALSE;
-BOOL positioning = FALSE;
+BOOL positioning = TRUE;
 BOOL draggableLabel = TRUE;
 UINT tcModifiers = MOD_ALT;
 UINT tcKey = 0x42; // 0x42 is 'b'
@@ -958,7 +958,7 @@ void loadSettings() {
   mergeMouseActions =
       GetPrivateProfileInt(L"KeyCastOW", L"mergeMouseActions", 1, iniFile);
   mouseClickAnimation =
-      GetPrivateProfileInt(L"KeyCastOW", L"mouseClickAnimation", 0, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"mouseClickAnimation", 1, iniFile);
   clickAnimRadius = clampUnsignedValue(
       GetPrivateProfileInt(L"KeyCastOW", L"clickAnimRadius",
                            CLICK_ANIM_DEFAULT_RADIUS, iniFile),
@@ -968,15 +968,15 @@ void loadSettings() {
   onlyCommandKeys =
       GetPrivateProfileInt(L"KeyCastOW", L"onlyCommandKeys", 0, iniFile);
   draggableLabel =
-      GetPrivateProfileInt(L"KeyCastOW", L"draggableLabel", 0, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"draggableLabel", 1, iniFile);
   updateMainWindowTransparency();
   tcModifiers =
       GetPrivateProfileInt(L"KeyCastOW", L"tcModifiers", MOD_ALT, iniFile);
   tcKey = GetPrivateProfileInt(L"KeyCastOW", L"tcKey", 0x42, iniFile);
   GetPrivateProfileString(
       L"KeyCastOW", L"branding",
-      L"Hi there, press any key to try, double click to configure.", branding,
-      BRANDINGMAX, iniFile);
+      L"Hi, press any key to try, double click to configure, drag to move.",
+      branding, BRANDINGMAX, iniFile);
   GetPrivateProfileString(L"KeyCastOW", L"comboChars", L"<->", comboChars, 4,
                           iniFile);
   memset(&labelSettings.font, 0, sizeof(labelSettings.font));
@@ -1640,36 +1640,6 @@ LONG __stdcall MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionInfo) {
   return EXCEPTION_EXECUTE_HANDLER;
 }
 
-BOOL ExtractResource(DWORD resourceId, LPCWSTR outputFilename) {
-  HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(resourceId), L"TEXT");
-  if (!hResource)
-    return FALSE;
-
-  HGLOBAL hLoadedResource = LoadResource(NULL, hResource);
-  if (!hLoadedResource)
-    return FALSE;
-
-  LPVOID pResourceData = LockResource(hLoadedResource);
-  if (!pResourceData)
-    return FALSE;
-
-  DWORD resourceSize = SizeofResource(NULL, hResource);
-  if (resourceSize == 0)
-    return FALSE;
-
-  HANDLE hFile = CreateFile(outputFilename, GENERIC_WRITE, 0, NULL,
-                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (hFile == INVALID_HANDLE_VALUE)
-    return FALSE;
-
-  DWORD bytesWritten;
-  BOOL result =
-      WriteFile(hFile, pResourceData, resourceSize, &bytesWritten, NULL);
-  CloseHandle(hFile);
-
-  return result && bytesWritten == resourceSize;
-}
-
 int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                    int nWinMode) {
   UNREFERENCED_PARAMETER(hPrevInst);
@@ -1707,9 +1677,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   }
   wcscat_s(iniFile, MAX_PATH, L".ini");
 
-  if (GetFileAttributes(iniFile) == INVALID_FILE_ATTRIBUTES) {
-    ExtractResource(IDR_INI_DEFAULT, iniFile);
-  }
+  BOOL iniExisted = GetFileAttributes(iniFile) != INVALID_FILE_ATTRIBUTES;
 
   LANGID langId = GetUserDefaultUILanguage();
   if ((langId & 0xFF) == LANG_CHINESE) {
@@ -1761,6 +1729,9 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   }
 
   loadSettings();
+  if (!iniExisted) {
+    saveSettings();
+  }
   updateCanvasSize(deskOrigin);
   hDlgSettings = CreateDialog(hThisInst, MAKEINTRESOURCE(IDD_DLGSETTINGS), NULL,
                               (DLGPROC)SettingsWndProc);

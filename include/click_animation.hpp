@@ -13,6 +13,6 @@ enum ClickAnimationType {
 constexpr int CLICK_ANIM_MAX = 5;
 constexpr int CLICK_ANIM_INTERVAL = 16;
 constexpr int CLICK_ANIM_FRAMES = 18;
-constexpr unsigned int CLICK_ANIM_DEFAULT_RADIUS = 25;
+constexpr unsigned int CLICK_ANIM_DEFAULT_RADIUS = 30;
 
 void triggerClickAnimation(int x, int y, ClickAnimationType type);
