@@ -36,10 +36,9 @@ public:
 
     SetCount(0);
 
-    BOOL success =
-        CreateTimerQueueTimer(&m_hTimer, NULL, TimerProc,
-                              this, immediately ? 0 : interval,
-                              once ? 0 : interval, WT_EXECUTEINTIMERTHREAD);
+    BOOL success = CreateTimerQueueTimer(
+        &m_hTimer, NULL, TimerProc, this, immediately ? 0 : interval,
+        once ? 0 : interval, WT_EXECUTEINTIMERTHREAD);
 
     return (success != 0);
   }

@@ -460,7 +460,8 @@ void drawLabelFrame(Graphics *g, const Pen *pen, const Brush *brush, RectF &rc,
   }
 }
 #define BR(alpha, bgr)                                                         \
-  ((alpha) << 24 | (bgr) >> 16 | ((bgr) & 0x0000ff00) | (((bgr) & 0x000000ff) << 16))
+  ((alpha) << 24 | (bgr) >> 16 | ((bgr) & 0x0000ff00) |                        \
+   (((bgr) & 0x000000ff) << 16))
 void updateLabel(int i) {
   eraseLabel(i);
 
@@ -1252,17 +1253,16 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
                    I18N(L"Settings", L"DisplayStandaloneModifierKey",
                         L"Display Standalone Modifier Key")
                        .c_str());
-    SetDlgItemText(hwndDlg, IDC_VISIBLESHIFT,
-                   I18N(L"Settings", L"ShiftAsModifierKey",
-                        L"SHIFT as Modifier Key")
-                       .c_str());
-    SetDlgItemText(hwndDlg, IDC_ONLYCOMMANDKEYS,
-                   I18N(L"Settings", L"OnlyCommandKeys", L"Only Command Keys")
-                       .c_str());
-    SetDlgItemText(hwndDlg, IDC_KEYAUTOREPEAT,
-                   I18N(L"Settings", L"HoldDownToRepeat",
-                        L"Hold Down to Repeat")
-                       .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_VISIBLESHIFT,
+        I18N(L"Settings", L"ShiftAsModifierKey", L"SHIFT as Modifier Key")
+            .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_ONLYCOMMANDKEYS,
+        I18N(L"Settings", L"OnlyCommandKeys", L"Only Command Keys").c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_KEYAUTOREPEAT,
+        I18N(L"Settings", L"HoldDownToRepeat", L"Hold Down to Repeat").c_str());
     SetDlgItemText(hwndDlg, IDC_STATIC_BORDERSIZE,
                    I18N(L"Settings", L"BorderSize", L"Border Size:").c_str());
     SetDlgItemText(hwndDlg, IDC_STATIC_BORDERCOLOR,
@@ -1277,18 +1277,18 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
                    I18N(L"Settings", L"CornerSize", L"Corner Size:").c_str());
     SetDlgItemText(hwndDlg, IDC_MOUSECAPTURING,
                    I18N(L"Settings", L"MouseAction", L"Mouse Action").c_str());
-    SetDlgItemText(hwndDlg, IDC_MOUSECAPTURINGMOD,
-                   I18N(L"Settings", L"MouseOnlyWithModifier",
-                        L"Mouse Only With Modifier")
-                       .c_str());
-    SetDlgItemText(hwndDlg, IDC_MERGEMOUSEACTIONS,
-                   I18N(L"Settings", L"DetectClickDblClick",
-                        L"Detect Click/DblClick")
-                       .c_str());
-    SetDlgItemText(hwndDlg, IDC_MOUSECLICKANIMATION,
-                   I18N(L"Settings", L"MouseClickAnimation",
-                        L"Mouse Click Animation")
-                       .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_MOUSECAPTURINGMOD,
+        I18N(L"Settings", L"MouseOnlyWithModifier", L"Mouse Only With Modifier")
+            .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_MERGEMOUSEACTIONS,
+        I18N(L"Settings", L"DetectClickDblClick", L"Detect Click/DblClick")
+            .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_MOUSECLICKANIMATION,
+        I18N(L"Settings", L"MouseClickAnimation", L"Mouse Click Animation")
+            .c_str());
     SetDlgItemText(hwndDlg, IDC_STATIC_CLICKANIMRADIUS,
                    I18N(L"Settings", L"MouseClickAnimationSize",
                         L"Mouse Animation Size(4-200):")
@@ -1303,9 +1303,9 @@ BOOL CALLBACK SettingsWndProc(HWND hwndDlg, UINT msg, WPARAM wParam,
                    I18N(L"Settings", L"Alignment", L"Alignment:").c_str());
     SetDlgItemText(hwndDlg, IDC_STATIC_POSITION,
                    I18N(L"Settings", L"Position", L"Position:").c_str());
-    SetDlgItemText(hwndDlg, IDC_DRAGGABLELABEL,
-                   I18N(L"Settings", L"DraggableLabel", L"Draggable Label")
-                       .c_str());
+    SetDlgItemText(
+        hwndDlg, IDC_DRAGGABLELABEL,
+        I18N(L"Settings", L"DraggableLabel", L"Draggable Label").c_str());
 
     GetWindowRect(hwndDlg, &settingsDlgRect);
     SetWindowPos(hwndDlg, 0,
