@@ -1,9 +1,5 @@
 // Copyright © 2015 - 2026 Brook Hong && Mikachu2333. MIT LICENSE. All Rights
 // Reserved.
-//
-
-// msbuild ./keycastow.sln /p:platform=x86 /p:Configuration=Release
-// msbuild ./keycastow.sln /p:platform=x64 /p:Configuration=Release
 
 #include <stdio.h>
 #include <windows.h>
@@ -73,11 +69,11 @@ BOOL mouseCapturing = TRUE;
 BOOL mouseCapturingMod = FALSE;
 BOOL keyAutoRepeat = TRUE;
 BOOL mergeMouseActions = TRUE;
-BOOL mouseClickAnimation = FALSE;
+BOOL mouseClickAnimation = TRUE;
 int alignment = 1;
 BOOL onlyCommandKeys = FALSE;
 BOOL positioning = FALSE;
-BOOL draggableLabel = FALSE;
+BOOL draggableLabel = TRUE;
 UINT tcModifiers = MOD_ALT;
 UINT tcKey = 0x42; // 0x42 is 'b'
 Color clearColor(0, 127, 127, 127);
@@ -941,8 +937,8 @@ void loadSettings() {
   maximumLines = clampUnsignedValue(
       GetPrivateProfileInt(L"KeyCastOW", L"maximumLines", 10, iniFile), 1,
       MAXLABELS);
-  deskOrigin.x = GetPrivateProfileInt(L"KeyCastOW", L"offsetX", 2, iniFile);
-  deskOrigin.y = GetPrivateProfileInt(L"KeyCastOW", L"offsetY", 2, iniFile);
+  deskOrigin.x = GetPrivateProfileInt(L"KeyCastOW", L"offsetX", 600, iniFile);
+  deskOrigin.y = GetPrivateProfileInt(L"KeyCastOW", L"offsetY", 600, iniFile);
   MONITORINFO mi;
   GetWorkAreaByOrigin(deskOrigin, mi);
   CopyMemory(&desktopRect, &mi.rcWork, sizeof(RECT));
