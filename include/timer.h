@@ -11,7 +11,6 @@ v1.0 2013 ArmyOfPirates
 #include <windows.h>
 
 static void CALLBACK TimerProc(void *, BOOLEAN);
-static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled);
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -38,7 +37,7 @@ public:
     SetCount(0);
 
     BOOL success =
-        CreateTimerQueueTimer(&m_hTimer, NULL, once ? TimerProcOnce : TimerProc,
+        CreateTimerQueueTimer(&m_hTimer, NULL, TimerProc,
                               this, immediately ? 0 : interval,
                               once ? 0 : interval, WT_EXECUTEINTIMERTHREAD);
 
@@ -70,16 +69,6 @@ private:
 // TimerProc
 //
 static void CALLBACK TimerProc(void *param, BOOLEAN timerCalled) {
-  UNREFERENCED_PARAMETER(timerCalled);
-  CTimer *timer = static_cast<CTimer *>(param);
-  if (!timer || !timer->OnTimedEvent) {
-    return;
-  }
-  timer->SetCount(timer->GetCount() + 1);
-  timer->OnTimedEvent();
-};
-
-static void CALLBACK TimerProcOnce(void *param, BOOLEAN timerCalled) {
   UNREFERENCED_PARAMETER(timerCalled);
   CTimer *timer = static_cast<CTimer *>(param);
   if (!timer || !timer->OnTimedEvent) {

@@ -19,6 +19,11 @@
 
 using namespace Gdiplus;
 
+// Protects keyLabels[], clickAnims[], gCanvas, deferredLabel/deferredTime,
+// newStrokeCount, and labelCount from concurrent access between timer
+// callbacks (thread pool) and hook procedures / UI (main thread).
+static CRITICAL_SECTION g_cs;
+
 #include "click_animation.h"
 #include "locale_manager.h"
 #include "resource.h"
@@ -375,7 +380,9 @@ void renderClickAnim(ClickAnim &anim) {
   ReleaseDC(anim.hWnd, hdc);
 }
 static void tickClickAnims() {
+  EnterCriticalSection(&g_cs);
   if (!clickAnimationAvailable) {
+    LeaveCriticalSection(&g_cs);
     return;
   }
 
@@ -390,9 +397,12 @@ static void tickClickAnims() {
       }
     }
   }
+  LeaveCriticalSection(&g_cs);
 }
 void triggerClickAnimation(int x, int y, ClickAnimationType type) {
+  EnterCriticalSection(&g_cs);
   if (!clickAnimationAvailable) {
+    LeaveCriticalSection(&g_cs);
     return;
   }
 
@@ -408,6 +418,7 @@ void triggerClickAnimation(int x, int y, ClickAnimationType type) {
 
   int wndSize = clickAnimRadius * 2 + 8;
   if (!clickAnims[slot].hWnd) {
+    LeaveCriticalSection(&g_cs);
     return;
   }
   clickAnims[slot].frame = 0;
@@ -419,6 +430,7 @@ void triggerClickAnimation(int x, int y, ClickAnimationType type) {
                y - wndSize / 2, wndSize, wndSize,
                SWP_NOACTIVATE | SWP_SHOWWINDOW);
   renderClickAnim(clickAnims[slot]);
+  LeaveCriticalSection(&g_cs);
 }
 void eraseLabel(int i) {
   RectF &rt = keyLabels[i].rect;
@@ -448,7 +460,7 @@ void drawLabelFrame(Graphics *g, const Pen *pen, const Brush *brush, RectF &rc,
   }
 }
 #define BR(alpha, bgr)                                                         \
-  (alpha << 24 | bgr >> 16 | (bgr & 0x0000ff00) | (bgr & 0x000000ff) << 16)
+  ((alpha) << 24 | (bgr) >> 16 | ((bgr) & 0x0000ff00) | (((bgr) & 0x000000ff) << 16))
 void updateLabel(int i) {
   eraseLabel(i);
 
@@ -484,39 +496,51 @@ void updateLabel(int i) {
 }
 
 void fadeLastLabel(BOOL whether) {
+  EnterCriticalSection(&g_cs);
   if (labelCount == 0) {
+    LeaveCriticalSection(&g_cs);
     return;
   }
   keyLabels[labelCount - 1].fade = whether;
+  LeaveCriticalSection(&g_cs);
 }
 
 BOOL isHeldKeyLabel(DWORD vkCode) {
+  EnterCriticalSection(&g_cs);
   for (DWORD i = 0; i < labelCount; i++) {
     if (keyLabels[i].held && keyLabels[i].holdVk == vkCode) {
+      LeaveCriticalSection(&g_cs);
       return TRUE;
     }
   }
+  LeaveCriticalSection(&g_cs);
   return FALSE;
 }
 
 void holdLastLabelForKey(DWORD vkCode) {
+  EnterCriticalSection(&g_cs);
   if (labelCount == 0) {
+    LeaveCriticalSection(&g_cs);
     return;
   }
   keyLabels[labelCount - 1].fade = FALSE;
   keyLabels[labelCount - 1].holdVk = vkCode;
   keyLabels[labelCount - 1].held = TRUE;
+  LeaveCriticalSection(&g_cs);
 }
 
 void releaseHeldLabelForKey(DWORD vkCode) {
+  EnterCriticalSection(&g_cs);
   for (DWORD i = 0; i < labelCount; i++) {
     if (keyLabels[i].held && keyLabels[i].holdVk == vkCode) {
       keyLabels[i].held = FALSE;
       keyLabels[i].holdVk = 0;
       keyLabels[i].fade = TRUE;
+      LeaveCriticalSection(&g_cs);
       return;
     }
   }
+  LeaveCriticalSection(&g_cs);
 }
 
 static int newStrokeCount = 0;
@@ -525,6 +549,7 @@ static int deferredTime;
 WCHAR deferredLabel[64];
 
 static void startFade() {
+  EnterCriticalSection(&g_cs);
   if (newStrokeCount > 0) {
     newStrokeCount -= SHOWTIMER_INTERVAL;
   }
@@ -558,7 +583,6 @@ static void startFade() {
       keyLabels[i].time = 0;
       if (keyLabels[i].length) {
         eraseLabel(i);
-        // erase keyLabels[i].length times to avoid remaining shadow
         keyLabels[i].length--;
         dirty = TRUE;
       }
@@ -567,6 +591,7 @@ static void startFade() {
   if (dirty) {
     updateLayeredWindow(hMainWnd);
   }
+  LeaveCriticalSection(&g_cs);
 }
 
 void ensureSpace(WCHAR *dest, size_t len) {
@@ -612,6 +637,7 @@ bool outOfLine(LPCWSTR text) {
  * behavior 2: replace last label with text
  */
 void showText(LPCWSTR text, int behavior = 0) {
+  EnterCriticalSection(&g_cs);
   SetWindowPos(hMainWnd, HWND_TOPMOST, 0, 0, 0, 0,
                SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
   size_t newLen = wcslen(text);
@@ -684,6 +710,7 @@ void showText(LPCWSTR text, int behavior = 0) {
   updateLabel(labelCount - 1);
   newStrokeCount = labelSettings.keyStrokeDelay;
   updateLayeredWindow(hMainWnd);
+  LeaveCriticalSection(&g_cs);
 }
 
 void updateCanvasSize(const POINT &pt) {
@@ -799,6 +826,7 @@ void GetWorkAreaByOrigin(const POINT &pt, MONITORINFO &mi) {
 }
 
 void positionOrigin(int action, POINT &pt) {
+  EnterCriticalSection(&g_cs);
   if (action == 0) {
     updateCanvasSize(pt);
 
@@ -834,6 +862,7 @@ void positionOrigin(int action, POINT &pt) {
     clearColor.SetValue(0x007f7f7f);
     gCanvas->Clear(clearColor);
   }
+  LeaveCriticalSection(&g_cs);
 }
 BOOL ColorDialog(HWND hWnd, COLORREF &clr) {
   DWORD dwCustClrs[16] = {
@@ -928,13 +957,15 @@ void saveSettings() {
   WritePrivateProfileString(L"KeyCastOW", L"comboChars", comboChars, iniFile);
 }
 void fixDeskOrigin() {
-  if (deskOrigin.x > desktopRect.right ||
-      deskOrigin.x < desktopRect.left + labelSettings.borderSize) {
+  if (deskOrigin.x > desktopRect.right) {
     deskOrigin.x = desktopRect.right - labelSettings.borderSize;
+  } else if (deskOrigin.x < desktopRect.left + labelSettings.borderSize) {
+    deskOrigin.x = desktopRect.left + labelSettings.borderSize;
   }
-  if (deskOrigin.y > desktopRect.bottom ||
-      deskOrigin.y < desktopRect.top + labelSettings.borderSize) {
+  if (deskOrigin.y > desktopRect.bottom) {
     deskOrigin.y = desktopRect.bottom;
+  } else if (deskOrigin.y < desktopRect.top + labelSettings.borderSize) {
+    deskOrigin.y = desktopRect.top + labelSettings.borderSize;
   }
 }
 void loadSettings() {
@@ -1545,11 +1576,13 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
       previewTimer.Start(PREVIEWTIMER_INTERVAL);
       break;
     case MENU_RESTORE:
+      EnterCriticalSection(&g_cs);
       DeleteFile(iniFile);
       loadSettings();
       updateCanvasSize(deskOrigin);
       createCanvas();
       prepareLabels();
+      LeaveCriticalSection(&g_cs);
       break;
 #ifdef _DEBUG
     case MENU_REPLAY: {
@@ -1593,6 +1626,7 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
     PostQuitMessage(0);
     break;
   case WM_DISPLAYCHANGE: {
+    EnterCriticalSection(&g_cs);
     MONITORINFO mi;
     GetWorkAreaByOrigin(deskOrigin, mi);
     CopyMemory(&desktopRect, &mi.rcWork, sizeof(RECT));
@@ -1601,6 +1635,7 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
     updateCanvasSize(deskOrigin);
     createCanvas();
     prepareLabels();
+    LeaveCriticalSection(&g_cs);
   } break;
   // hold mouse to move
   case WM_LBUTTONDOWN:
@@ -1740,7 +1775,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
     return -1;
   }
 
-  SetProcessDPIAware();
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 
   MSG msg;
 
@@ -1838,6 +1873,8 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   err = _wfopen_s(&logStream, logFile, L"a");
 #endif
 
+  InitializeCriticalSection(&g_cs);
+
   GdiplusStartupInput gdiplusStartupInput;
   ULONG_PTR gdiplusToken;
   GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
@@ -1848,6 +1885,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
                     L"Could not register window class")
                    .c_str(),
                I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+    DeleteCriticalSection(&g_cs);
     GdiplusShutdown(gdiplusToken);
     CloseHandle(hMutex);
     return 0;
@@ -1864,6 +1902,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
         I18N(L"Messages", L"CouldNotCreateWindow", L"Could not create window")
             .c_str(),
         I18N(L"Messages", L"Error", L"Error").c_str(), MB_OK);
+    DeleteCriticalSection(&g_cs);
     GdiplusShutdown(gdiplusToken);
     CloseHandle(hMutex);
     return 0;
@@ -2022,6 +2061,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   fclose(logStream);
 #endif
 
+  DeleteCriticalSection(&g_cs);
   GdiplusShutdown(gdiplusToken);
   CloseHandle(hMutex);
   return (int)msg.wParam;
