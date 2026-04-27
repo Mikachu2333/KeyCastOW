@@ -4,15 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build
 
-Requires MSBuild (Visual Studio 2022 Build Tools, platform toolset v145).
+Requires Visual Studio 2022 (platform toolset v145), CMake 3.20+, and Ninja.
+
+### VS Code (CMake Tools extension)
+
+Open the project, select a configure preset from [CMakePresets.json](CMakePresets.json), and build:
+
+- `Ninja Debug (x86)` / `Ninja Release (x86)` — 32-bit
+- `Ninja Debug (x64)` / `Ninja Release (x64)` — 64-bit
+
+### Command line
 
 ```pwsh
-msbuild keycastow.sln /p:Platform=Win32 /p:Configuration=Release
-msbuild keycastow.sln /p:Platform=x64 /p:Configuration=Release
+# Configure
+cmake -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -B build/release-x64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_GENERATOR_PLATFORM=x64
+
+# Build
+cmake --build build/release
 ```
 
-Output binaries are named `keycastow_x86.exe` and `keycastow_x64.exe` in `Release\` or `Debug\`.
-Post-build step copies `*.ini` files from `resources\` to the output directory.
+### Output
+
+Binaries: `keycastow_x86.exe` / `keycastow_x64.exe` in `Debug\` or `Release\` (at project root).
+
+Post-build steps: copy `*.ini` files to output directory, embed `keycastow.exe.manifest` for Common Controls v6 theming.
+
+### Build matrix
+
+| Config  | CRT   | Optimization        | Defines        |
+|---------|-------|---------------------|----------------|
+| Debug   | /MDd  | /Od /Ob0            | _DEBUG         |
+| Release | /MT   | /O2 /Oi /GL /Gy     | NDEBUG         |
+
+CRT mismatch with original vcxproj is intentional: Release uses static linking for portability, Debug uses dynamic for faster linking.
 
 ## Architecture
 
@@ -26,7 +51,7 @@ A portable Windows keystroke/mouse visualizer — single executable, no installe
 | [src/keylog.cpp](src/keylog.cpp)   | Low-level keyboard hook (`LLKeyboardProc`) and mouse hook (`LLMouseProc`), key-to-symbol translation via `ToUnicodeEx`, modifier state tracking, mouse click merge/double-click detection |
 | [include/timer.h](include/timer.h) | `CTimer` — thin wrapper around Windows `CreateTimerQueueTimer` with a callback function pointer (`OnTimedEvent`)                                                                          |
 
-The project `.vcxproj` lists source files explicitly. Headers in `include/` are included via the `AdditionalIncludeDirectories` build setting.
+The project builds via [CMakeLists.txt](CMakeLists.txt). Source files are listed there; headers in `include/` are on the target's include path.
 
 **Important**: [keycast.cpp](src/keycast.cpp) uses an unconventional include pattern — it `#include "keycast.h"` and `#include "keylog.h"` inline within the file body (line 107-108), not at the top. This is intentional to give the included code access to the global variables and helper functions defined above the include point. Do not refactor this to top-of-file includes without understanding the data flow.
 

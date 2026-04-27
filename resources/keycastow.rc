@@ -1,7 +1,7 @@
 ﻿// Microsoft Visual C++ generated resource script.
 //
-#include "resource.h"
-#include "version.h"
+#include "resource.hpp"
+#include "version.hpp"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 
 1 TEXTINCLUDE 
 BEGIN
-    "resource.h\0"
+    "resource.hpp\0"
 END
 
 2 TEXTINCLUDE 

@@ -4,8 +4,8 @@
 
 #include <windows.h>
 
-#include "click_animation.h"
-#include "keylog.h"
+#include "click_animation.hpp"
+#include "keylog.hpp"
 
 struct Key {
   int val;
@@ -178,15 +178,6 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
   }
   int rr = ToUnicodeEx(vk, sc, btKeyState, translated, _countof(translated) - 1,
                        0, hklLayout);
-#ifdef _DEBUG
-  WCHAR ss[KL_NAMELENGTH];
-  GetKeyboardLayoutName(ss);
-  std::wstring wide(ss);
-  std::string str(wide.begin(), wide.end());
-  std::stringstream line;
-  line << vk << ":" << rr << ":" << sc << "\n";
-  // log(line);
-#endif
   if (rr > 0) {
     size_t copied =
         (rr < (int)_countof(symbol)) ? (size_t)rr : _countof(symbol) - 1;
@@ -283,7 +274,6 @@ LPCWSTR getModSpecialKey(UINT vk, BOOL mod = FALSE) {
 }
 
 void setModifier(UINT vk, ModifierState &modState, BOOL value) {
-  LPCWSTR ck = getSpecialKey(vk);
   if (vk == VK_LSHIFT || vk == VK_RSHIFT || vk == VK_SHIFT) {
     modState.shift = value;
   } else if (vk == VK_LCONTROL || vk == VK_RCONTROL || vk == VK_CONTROL) {
@@ -362,7 +352,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
     if (isAltGr) {
       modifierState.altGr = FALSE;
       modifierUsed = FALSE;
-    } else if (k.vkCode >= 0xA0 && k.vkCode <= 0xA5 || k.vkCode == VK_LWIN ||
+    } else if ((k.vkCode >= 0xA0 && k.vkCode <= 0xA5) || k.vkCode == VK_LWIN ||
                k.vkCode == VK_RWIN) {
       cleanModifier(k.vkCode, modifierState);
       modifierUsed = FALSE;
@@ -382,7 +372,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
     // released.
     BOOL isAltGr = inAltGrMiddle && k.vkCode == VK_RMENU && wp == WM_SYSKEYDOWN;
     inAltGrMiddle = FALSE;
-    if (k.vkCode >= 0xA0 && k.vkCode <= 0xA5 ||                  // ctrl / alt
+    if ((k.vkCode >= 0xA0 && k.vkCode <= 0xA5) ||                  // ctrl / alt
         isAltGr || k.vkCode == VK_LWIN || k.vkCode == VK_RWIN) { // win
       if (isAltGr) {
         modifierState.altGr = TRUE;
@@ -404,7 +394,6 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
         displayedKey = TRUE;
       }
     } else {
-      WORD a = 0;
       BOOL mod = isAnyModifierDown(modifierState);
       if (k.vkCode == VK_BACK || k.vkCode == VK_TAB || k.vkCode == VK_RETURN ||
           k.vkCode == VK_ESCAPE || k.vkCode == VK_SPACE) {

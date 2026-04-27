@@ -24,10 +24,10 @@ using namespace Gdiplus;
 // callbacks (thread pool) and hook procedures / UI (main thread).
 static CRITICAL_SECTION g_cs;
 
-#include "click_animation.h"
-#include "locale_manager.h"
-#include "resource.h"
-#include "timer.h"
+#include "click_animation.hpp"
+#include "locale_manager.hpp"
+#include "resource.hpp"
+#include "timer.hpp"
 CTimer showTimer;
 CTimer previewTimer;
 
@@ -109,8 +109,7 @@ RECT desktopRect;
 SIZE canvasSize;
 POINT canvasOrigin;
 
-#include "keycast.h"
-#include "keylog.h"
+#include "keylog.hpp"
 
 const WCHAR *szWinName = L"KeyCastOW";
 HWND hMainWnd;
@@ -170,56 +169,6 @@ static void updateMainWindowTransparency() {
 void showText(LPCWSTR text, int behavior);
 
 #ifdef _DEBUG
-WCHAR capFile[MAX_PATH];
-FILE *capStream = NULL;
-WCHAR recordFN[MAX_PATH];
-int replayStatus = 0;
-#define MENU_REPLAY 35
-struct Displayed {
-  DWORD tm;
-  int behavior;
-  DWORD len;
-  Displayed(DWORD t, int b, DWORD l) {
-    tm = t;
-    behavior = b;
-    len = l;
-  }
-};
-DWORD WINAPI replay(LPVOID ptr) {
-  replayStatus = 1;
-  FILE *stream = NULL;
-  WCHAR tmp[256];
-  errno_t err = _wfopen_s(&stream, (LPCWSTR)ptr, L"rb");
-  if (err != 0 || !stream) {
-    replayStatus = 0;
-    return 0;
-  }
-
-  Displayed dp(0, 0, 0);
-  if (fread(&dp, sizeof(Displayed), 1, stream) != 1 ||
-      dp.len >= _countof(tmp) ||
-      fread(tmp, sizeof(WCHAR), dp.len, stream) != dp.len) {
-    fclose(stream);
-    replayStatus = 0;
-    return 0;
-  }
-  tmp[dp.len] = L'\0';
-  showText(tmp, dp.behavior);
-  DWORD lastTm = dp.tm;
-  while (replayStatus == 1 && fread(&dp, sizeof(Displayed), 1, stream) == 1) {
-    Sleep(dp.tm - lastTm);
-    lastTm = dp.tm;
-    if (dp.len >= _countof(tmp) ||
-        fread(tmp, sizeof(WCHAR), dp.len, stream) != dp.len) {
-      break;
-    }
-    tmp[dp.len] = '\0';
-    showText(tmp, dp.behavior);
-  }
-  fclose(stream);
-  replayStatus = 0;
-  return 0;
-}
 #include <sstream>
 WCHAR logFile[MAX_PATH];
 FILE *logStream;
@@ -258,11 +207,11 @@ void stamp(HWND hwnd, LPCWSTR text) {
   SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, wndSize.cx, wndSize.cy,
                SWP_NOMOVE | SWP_NOACTIVATE);
 
-  SolidBrush bgBrush(Color::Color(0xaf007cfe));
+  SolidBrush bgBrush(Gdiplus::Color(0xaf007cfe));
   g.FillRectangle(&bgBrush, rc);
-  SolidBrush textBrushPlus(Color(0xaf303030));
+  SolidBrush textBrushPlus(Gdiplus::Color(0xaf303030));
   g.DrawString(text, textLength, fontPlus, rc, &format, &textBrushPlus);
-  SolidBrush brushPlus(Color::Color(0xaffefefe));
+  SolidBrush brushPlus(Gdiplus::Color(0xaffefefe));
   rc.X += 2;
   rc.Y += 2;
   g.DrawString(text, textLength, fontPlus, rc, &format, &brushPlus);
@@ -485,12 +434,13 @@ void updateLabel(int i) {
     int bgAlpha = (int)(r * labelSettings.bgOpacity),
         textAlpha = (int)(r * labelSettings.textOpacity),
         borderAlpha = (int)(r * labelSettings.borderOpacity);
-    Pen penPlus(Color::Color(BR(borderAlpha, labelSettings.borderColor)),
+    Pen penPlus(Gdiplus::Color(BR(borderAlpha, labelSettings.borderColor)),
                 labelSettings.borderSize + 0.0f);
-    SolidBrush brushPlus(Color::Color(BR(bgAlpha, labelSettings.bgColor)));
+    SolidBrush brushPlus(Gdiplus::Color(BR(bgAlpha, labelSettings.bgColor)));
     drawLabelFrame(gCanvas, &penPlus, &brushPlus, rc,
                    (REAL)labelSettings.cornerSize);
-    SolidBrush textBrushPlus(Color(BR(textAlpha, labelSettings.textColor)));
+    SolidBrush textBrushPlus(
+        Gdiplus::Color(BR(textAlpha, labelSettings.textColor)));
     gCanvas->DrawString(keyLabels[i].text, keyLabels[i].length, fontPlus,
                         PointF(rc.X, rc.Y), &textBrushPlus);
   }
@@ -569,7 +519,6 @@ static void startFade() {
   }
 
   for (i = 0; i < labelCount; i++) {
-    RectF &rt = keyLabels[i].rect;
     if ((unsigned long)keyLabels[i].time > labelSettings.fadeDuration) {
       if (keyLabels[i].fade) {
         keyLabels[i].time -= SHOWTIMER_INTERVAL;
@@ -642,15 +591,6 @@ void showText(LPCWSTR text, int behavior = 0) {
   SetWindowPos(hMainWnd, HWND_TOPMOST, 0, 0, 0, 0,
                SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
   size_t newLen = wcslen(text);
-
-#ifdef _DEBUG
-  if (replayStatus == 0 && capStream) {
-    Displayed dp(GetTickCount(), behavior, (DWORD)newLen);
-    fwrite(&dp, sizeof(Displayed), 1, capStream);
-    fwrite(text, sizeof(WCHAR), newLen, capStream);
-    fflush(capStream);
-  }
-#endif
 
   DWORD i;
   if (behavior == 2) {
@@ -1141,7 +1081,7 @@ static void previewLabel() {
   getLabelSettings(hDlgSettings, previewLabelSettings);
   DWORD mg =
       previewLabelSettings.lingerTime + previewLabelSettings.fadeDuration + 600;
-  double r;
+  double r = 0.0;
   if (previewTime < PREVIEWTIMER_INTERVAL || previewTime > mg) {
     previewTime = mg;
   }
@@ -1176,21 +1116,24 @@ static void previewLabel() {
                 rc.Y + previewLabelSettings.borderSize);
   g.MeasureString(text, 2, &font, origin, &rc);
 
-  rc.X += (rtWidth - (int)rc.Width) / 2 - previewLabelSettings.borderSize;
-  rc.Y += (rtHeight - (int)rc.Height) / 2 - previewLabelSettings.borderSize;
+  rc.X +=
+      ((float)rtWidth - (int)rc.Width) / 2 - previewLabelSettings.borderSize;
+  rc.Y +=
+      ((float)rtHeight - (int)rc.Height) / 2 - previewLabelSettings.borderSize;
   origin.X = rc.X;
   origin.Y = rc.Y;
 
   int bgAlpha = (int)(r * previewLabelSettings.bgOpacity),
       textAlpha = (int)(r * previewLabelSettings.textOpacity),
       borderAlpha = (int)(r * previewLabelSettings.borderOpacity);
-  Pen penPlus(Color::Color(BR(borderAlpha, previewLabelSettings.borderColor)),
+  Pen penPlus(Gdiplus::Color(BR(borderAlpha, previewLabelSettings.borderColor)),
               previewLabelSettings.borderSize + 0.0f);
-  SolidBrush brushPlus(Color::Color(BR(bgAlpha, previewLabelSettings.bgColor)));
+  SolidBrush brushPlus(
+      Gdiplus::Color(BR(bgAlpha, previewLabelSettings.bgColor)));
   drawLabelFrame(&g, &penPlus, &brushPlus, rc,
                  (REAL)previewLabelSettings.cornerSize);
   SolidBrush textBrushPlus(
-      Color(BR(textAlpha, previewLabelSettings.textColor)));
+      Gdiplus::Color(BR(textAlpha, previewLabelSettings.textColor)));
   INT previewTextLength = (INT)wcslen(text);
   g.DrawString(text, previewTextLength, &font, origin, &textBrushPlus);
   BitBlt(hdc, rt.left, rt.top, rtWidth, rtHeight, memDC, 0, 0, SRCCOPY);
@@ -1544,9 +1487,6 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
             .c_str());
     // TODO: 添加语言切换按钮
     // AppendMenu( hPopMenu, MF_STRING, MENU_LANGUAGES,  L"&Languages" );
-#ifdef _DEBUG
-    AppendMenu(hPopMenu, MF_STRING, MENU_REPLAY, L"Re&play");
-#endif
     // AppendMenu( hPopMenu, MF_STRING, MENU_EXIT,    L"E&xit" );
     AppendMenu(hPopMenu, MF_STRING, MENU_EXIT,
                I18N(L"Menu", L"Exit", L"E&xit").c_str());
@@ -1584,32 +1524,6 @@ LRESULT CALLBACK WindowFunc(HWND hWnd, UINT message, WPARAM wParam,
       prepareLabels();
       LeaveCriticalSection(&g_cs);
       break;
-#ifdef _DEBUG
-    case MENU_REPLAY: {
-      if (replayStatus == 1) {
-        replayStatus = 2;
-        ModifyMenu(hPopMenu, MENU_REPLAY, MF_STRING, MENU_REPLAY, L"Re&play");
-      } else {
-        OPENFILENAME ofn;
-        ZeroMemory(&ofn, sizeof(OPENFILENAME));
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = NULL;
-        ofn.hInstance = hInstance;
-        ofn.lpstrFile = recordFN;
-        ofn.nMaxFile = _countof(recordFN);
-        ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST;
-        if (GetOpenFileName(&ofn)) {
-          unsigned long id = 1;
-          HANDLE replayThread = CreateThread(NULL, 0, replay, recordFN, 0, &id);
-          if (replayThread) {
-            CloseHandle(replayThread);
-          }
-          ModifyMenu(hPopMenu, MENU_REPLAY, MF_STRING, MENU_REPLAY,
-                     L"Stop re&play");
-        }
-      }
-    } break;
-#endif
     case MENU_EXIT:
       DestroyWindow(hWnd);
       break;
@@ -1862,15 +1776,10 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   LocaleManager::GetInstance().Load(localeFile);
 
 #ifdef _DEBUG
-  wcscpy_s(capFile, MAX_PATH, iniFile);
-  capFile[wcslen(capFile) - 4] = '\0';
-  wcscat_s(capFile, MAX_PATH, L".cap");
-
   wcscpy_s(logFile, MAX_PATH, iniFile);
   logFile[wcslen(logFile) - 4] = '\0';
   wcscat_s(logFile, MAX_PATH, L".txt");
-  errno_t err = _wfopen_s(&capStream, capFile, L"wb");
-  err = _wfopen_s(&logStream, logFile, L"a");
+  _wfopen_s(&logStream, logFile, L"a");
 #endif
 
   InitializeCriticalSection(&g_cs);
@@ -2057,7 +1966,6 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   }
   DeleteObject(hlabelFont);
 #ifdef _DEBUG
-  fclose(capStream);
   fclose(logStream);
 #endif
 

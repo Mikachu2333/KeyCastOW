@@ -1,5 +1,7 @@
 **/Debug
 **/Release
+build/*
+
 /.vs
 /keycastow.aps
 /keycastow.vcxproj.user

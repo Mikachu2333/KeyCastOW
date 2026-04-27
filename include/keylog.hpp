@@ -1,8 +1,9 @@
 // Copyright © 2014 Brook Hong. All Rights Reserved.
-//
 
 #ifndef KEYLOG_H_INCLUDED
 #define KEYLOG_H_INCLUDED
+
+#include <windows.h>
 
 extern HHOOK kbdhook;
 extern HHOOK moshook;

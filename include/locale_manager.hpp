@@ -1,10 +1,10 @@
 #pragma once
-#include <windows.h>
 #include <fstream>
 #include <iterator>
 #include <map>
 #include <sstream>
 #include <string>
+#include <windows.h>
 
 class LocaleManager {
 public:
