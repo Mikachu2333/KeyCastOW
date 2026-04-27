@@ -74,17 +74,3 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "keycastow${ARCH_SUFFIX}"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/$<CONFIG>"
 )
-
-# ── Post-build: copy .ini files to output directory ──
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/keycastow.ini"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/keycastow_en.ini"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/keycastow_zh.ini"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-    COMMENT "Copying .ini files to output directory"
-)

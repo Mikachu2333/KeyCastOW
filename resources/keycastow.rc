@@ -215,8 +215,6 @@ BEGIN
 END
 
 IDR_INI_DEFAULT TEXT "keycastow.ini"
-IDR_INI_EN TEXT "keycastow_en.ini"
-IDR_INI_ZH TEXT "keycastow_zh.ini"
 
 #endif    // Chinese (Simplified, PRC) resources
 /////////////////////////////////////////////////////////////////////////////

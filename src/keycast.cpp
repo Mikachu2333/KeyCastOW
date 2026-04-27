@@ -21,6 +21,7 @@ using namespace Gdiplus;
 static CRITICAL_SECTION g_cs;
 
 #include "click_animation.hpp"
+#include "locale_data.hpp"
 #include "locale_manager.hpp"
 #include "resource.hpp"
 #include "timer.hpp"
@@ -1710,66 +1711,12 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
     ExtractResource(IDR_INI_DEFAULT, iniFile);
   }
 
-  WCHAR localeFile[MAX_PATH];
-  GetModuleFileName(NULL, localeFile, MAX_PATH);
-  WCHAR *lastSlash = wcsrchr(localeFile, '\\');
-  if (lastSlash) {
-    *lastSlash = '\0';
-  }
-
-  WCHAR enIni[MAX_PATH];
-  swprintf_s(enIni, MAX_PATH, L"%s\\keycastow_en.ini", localeFile);
-  if (GetFileAttributes(enIni) == INVALID_FILE_ATTRIBUTES) {
-    ExtractResource(IDR_INI_EN, enIni);
-  }
-
-  WCHAR zhIni[MAX_PATH];
-  swprintf_s(zhIni, MAX_PATH, L"%s\\keycastow_zh.ini", localeFile);
-  if (GetFileAttributes(zhIni) == INVALID_FILE_ATTRIBUTES) {
-    ExtractResource(IDR_INI_ZH, zhIni);
-  }
-
   LANGID langId = GetUserDefaultUILanguage();
-  WCHAR langCode[10] = {0};
-  LCID lcid = MAKELCID(langId, SORT_DEFAULT);
-
-  // Try to get ISO 639-1 language name (e.g., "fr", "en", "zh")
-  if (GetLocaleInfo(lcid, LOCALE_SISO639LANGNAME, langCode, 10) > 0) {
-    WCHAR targetIni[MAX_PATH];
-    swprintf_s(targetIni, MAX_PATH, L"%s\\keycastow_%s.ini", localeFile,
-               langCode);
-
-    // If the specific language file exists, use it
-    if (GetFileAttributes(targetIni) != INVALID_FILE_ATTRIBUTES) {
-      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_");
-      wcscat_s(localeFile, MAX_PATH, langCode);
-      wcscat_s(localeFile, MAX_PATH, L".ini");
-    } else {
-      // Fallback logic if specific file doesn't exist
-      if ((langId & 0xFF) == LANG_CHINESE) {
-        wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
-      } else {
-        wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
-      }
-    }
+  if ((langId & 0xFF) == LANG_CHINESE) {
+    LocaleManager::GetInstance().SetData(kLocaleZh);
   } else {
-    // Fallback if GetLocaleInfo fails
-    if ((langId & 0xFF) == LANG_CHINESE) {
-      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_zh.ini");
-    } else {
-      wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
-    }
+    LocaleManager::GetInstance().SetData(kLocaleEn);
   }
-
-  if (GetFileAttributes(localeFile) == INVALID_FILE_ATTRIBUTES) {
-    GetModuleFileName(NULL, localeFile, MAX_PATH);
-    lastSlash = wcsrchr(localeFile, '\\');
-    if (lastSlash)
-      *lastSlash = '\0';
-    wcscat_s(localeFile, MAX_PATH, L"\\keycastow_en.ini");
-  }
-
-  LocaleManager::GetInstance().Load(localeFile);
 
 #ifdef _DEBUG
   wcscpy_s(logFile, MAX_PATH, iniFile);
