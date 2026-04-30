@@ -156,6 +156,7 @@ extern WCHAR deferredLabel[64];
 HHOOK kbdhook, moshook;
 void showText(LPCWSTR text, int behavior = 0);
 void fadeLastLabel(BOOL whether);
+void refreshLastLabel();
 BOOL isHeldKeyLabel(DWORD vkCode);
 void holdLastLabelForKey(DWORD vkCode);
 void releaseHeldLabelForKey(DWORD vkCode);
@@ -372,7 +373,7 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
     // released.
     BOOL isAltGr = inAltGrMiddle && k.vkCode == VK_RMENU && wp == WM_SYSKEYDOWN;
     inAltGrMiddle = FALSE;
-    if ((k.vkCode >= 0xA0 && k.vkCode <= 0xA5) ||                  // ctrl / alt
+    if ((k.vkCode >= 0xA0 && k.vkCode <= 0xA5) ||                // ctrl / alt
         isAltGr || k.vkCode == VK_LWIN || k.vkCode == VK_RWIN) { // win
       if (isAltGr) {
         modifierState.altGr = TRUE;
@@ -439,7 +440,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
   int behavior = 1;
   static DWORD mouseButtonDown = 0;
   static DWORD lastClick = 0;
-  static int lastWheelAnimDirection = 0;
+  static DWORD lastWheelAnimTime = 0;
   static WCHAR lastMouseAction[64] = L"\0";
   BOOL holdButton = FALSE;
   if (positioning) {
@@ -455,8 +456,6 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
         wheelAnimDirection =
             GET_WHEEL_DELTA_WPARAM(static_cast<WPARAM>(ms->mouseData)) > 0 ? 1
                                                                            : -1;
-      } else {
-        lastWheelAnimDirection = 0;
       }
 
       // Trigger click animation on mouse events
@@ -474,18 +473,19 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
           animType =
               (xButton == XBUTTON1) ? CLICK_ANIM_XBUTTON1 : CLICK_ANIM_XBUTTON2;
         } else if (idx == 10) {
-          animType = (wheelAnimDirection > 0) ? CLICK_ANIM_SCROLL_UP
-                                              : CLICK_ANIM_SCROLL_DOWN;
-          hasAnimation = (wheelAnimDirection != lastWheelAnimDirection);
+          DWORD now = GetTickCount();
+          hasAnimation = (now - lastWheelAnimTime >= 50);
+          if (hasAnimation) {
+            lastWheelAnimTime = now;
+            animType = (wheelAnimDirection > 0) ? CLICK_ANIM_SCROLL_UP
+                                                : CLICK_ANIM_SCROLL_DOWN;
+          }
         } else {
           hasAnimation = FALSE;
         }
         if (hasAnimation) {
           triggerClickAnimation(ms->pt.x, ms->pt.y, animType);
         }
-      }
-      if (wheelAnimDirection != 0) {
-        lastWheelAnimDirection = wheelAnimDirection;
       }
 
       // When mouseClickAnimation is on and no modifier is held, skip text log
@@ -505,7 +505,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
                      : L"%sDown",
                  mouseActions[idx]);
         if (wcscmp(c, lastMouseAction) == 0) {
-          fadeLastLabel(FALSE);
+          refreshLastLabel();
           return CallNextHookEx(moshook, nCode, wp, lp);
         }
         wcscpy_s(lastMouseAction, 64, c);

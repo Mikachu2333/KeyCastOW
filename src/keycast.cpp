@@ -453,6 +453,16 @@ void fadeLastLabel(BOOL whether) {
   LeaveCriticalSection(&g_cs);
 }
 
+void refreshLastLabel() {
+  EnterCriticalSection(&g_cs);
+  if (labelCount > 0) {
+    keyLabels[labelCount - 1].time =
+        labelSettings.lingerTime + labelSettings.fadeDuration;
+    keyLabels[labelCount - 1].fade = TRUE;
+  }
+  LeaveCriticalSection(&g_cs);
+}
+
 BOOL isHeldKeyLabel(DWORD vkCode) {
   EnterCriticalSection(&g_cs);
   for (DWORD i = 0; i < labelCount; i++) {
