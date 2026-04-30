@@ -73,7 +73,7 @@ BOOL mergeMouseActions = TRUE;
 BOOL mouseClickAnimation = TRUE;
 int alignment = 1;
 BOOL onlyCommandKeys = FALSE;
-BOOL positioning = TRUE;
+BOOL positioning = FALSE;
 BOOL draggableLabel = TRUE;
 UINT tcModifiers = MOD_ALT;
 UINT tcKey = 0x42; // 0x42 is 'b'
@@ -763,6 +763,8 @@ void GetWorkAreaByOrigin(const POINT &pt, MONITORINFO &mi) {
   GetMonitorInfo(hMonitor, &mi);
 }
 
+void saveSettings();
+
 void positionOrigin(int action, POINT &pt) {
   EnterCriticalSection(&g_cs);
   if (action == 0) {
@@ -799,6 +801,7 @@ void positionOrigin(int action, POINT &pt) {
     updateCanvasSize(pt);
     clearColor.SetValue(0x007f7f7f);
     gCanvas->Clear(clearColor);
+    saveSettings();
   }
   LeaveCriticalSection(&g_cs);
 }
@@ -975,7 +978,7 @@ void loadSettings() {
   tcKey = GetPrivateProfileInt(L"KeyCastOW", L"tcKey", 0x42, iniFile);
   GetPrivateProfileString(
       L"KeyCastOW", L"branding",
-      L"Hi, press any key to try, double click to configure, drag to move.",
+      L"Hi, press any key to try, double click to config, drag to move.",
       branding, BRANDINGMAX, iniFile);
   GetPrivateProfileString(L"KeyCastOW", L"comboChars", L"<->", comboChars, 4,
                           iniFile);
@@ -1789,6 +1792,15 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
   createCanvas();
   prepareLabels();
   ShowWindow(hMainWnd, SW_SHOW);
+
+  if (!iniExisted) {
+    clearColor.SetValue(0x7f7f7f7f);
+    gCanvas->Clear(clearColor);
+    showText(L"╋", 1);
+    fadeLastLabel(FALSE);
+    positioning = TRUE;
+  }
+
   HFONT hlabelFont =
       CreateFont(20, 10, 0, 0, FW_BLACK, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                  OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
