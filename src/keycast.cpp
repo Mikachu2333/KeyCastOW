@@ -346,6 +346,10 @@ static void tickClickAnims() {
   LeaveCriticalSection(&g_cs);
 }
 void triggerClickAnimation(int x, int y, ClickAnimationType type) {
+  ClickAnim snap;
+  snap.hWnd = NULL;
+  int wndSize = 0;
+
   EnterCriticalSection(&g_cs);
   if (!clickAnimationAvailable) {
     LeaveCriticalSection(&g_cs);
@@ -362,7 +366,7 @@ void triggerClickAnimation(int x, int y, ClickAnimationType type) {
   if (slot < 0)
     slot = 0; // reuse oldest
 
-  int wndSize = clickAnimRadius * 2 + 8;
+  wndSize = clickAnimRadius * 2 + 8;
   if (!clickAnims[slot].hWnd) {
     LeaveCriticalSection(&g_cs);
     return;
@@ -372,11 +376,14 @@ void triggerClickAnimation(int x, int y, ClickAnimationType type) {
   clickAnims[slot].type = type;
   clickAnims[slot].centerX = x;
   clickAnims[slot].centerY = y;
-  SetWindowPos(clickAnims[slot].hWnd, HWND_TOPMOST, x - wndSize / 2,
+  // Snapshot for lock-free render
+  snap = clickAnims[slot];
+  LeaveCriticalSection(&g_cs);
+
+  SetWindowPos(snap.hWnd, HWND_TOPMOST, x - wndSize / 2,
                y - wndSize / 2, wndSize, wndSize,
                SWP_NOACTIVATE | SWP_SHOWWINDOW);
-  renderClickAnim(clickAnims[slot]);
-  LeaveCriticalSection(&g_cs);
+  renderClickAnim(snap);
 }
 void eraseLabel(int i) {
   RectF &rt = keyLabels[i].rect;
@@ -811,9 +818,12 @@ void positionOrigin(int action, POINT &pt) {
     updateCanvasSize(pt);
     clearColor.SetValue(0x007f7f7f);
     gCanvas->Clear(clearColor);
-    saveSettings();
   }
   LeaveCriticalSection(&g_cs);
+
+  if (action != 0) {
+    saveSettings();
+  }
 }
 BOOL ColorDialog(HWND hWnd, COLORREF &clr) {
   DWORD dwCustClrs[16] = {
