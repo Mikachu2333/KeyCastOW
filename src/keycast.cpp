@@ -326,6 +326,11 @@ void renderClickAnim(ClickAnim &anim) {
   ReleaseDC(anim.hWnd, hdc);
 }
 static void tickClickAnims() {
+  ClickAnim snaps[CLICK_ANIM_MAX];
+  int count = 0;
+  HWND toHide[CLICK_ANIM_MAX];
+  int hideCount = 0;
+
   EnterCriticalSection(&g_cs);
   if (!clickAnimationAvailable) {
     LeaveCriticalSection(&g_cs);
@@ -337,13 +342,20 @@ static void tickClickAnims() {
       clickAnims[i].frame++;
       if (clickAnims[i].frame >= CLICK_ANIM_FRAMES) {
         clickAnims[i].active = FALSE;
-        ShowWindow(clickAnims[i].hWnd, SW_HIDE);
+        toHide[hideCount++] = clickAnims[i].hWnd;
       } else {
-        renderClickAnim(clickAnims[i]);
+        snaps[count++] = clickAnims[i];
       }
     }
   }
   LeaveCriticalSection(&g_cs);
+
+  for (int i = 0; i < hideCount; i++) {
+    ShowWindow(toHide[i], SW_HIDE);
+  }
+  for (int i = 0; i < count; i++) {
+    renderClickAnim(snaps[i]);
+  }
 }
 void triggerClickAnimation(int x, int y, ClickAnimationType type) {
   ClickAnim snap;
@@ -380,9 +392,8 @@ void triggerClickAnimation(int x, int y, ClickAnimationType type) {
   snap = clickAnims[slot];
   LeaveCriticalSection(&g_cs);
 
-  SetWindowPos(snap.hWnd, HWND_TOPMOST, x - wndSize / 2,
-               y - wndSize / 2, wndSize, wndSize,
-               SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  SetWindowPos(snap.hWnd, HWND_TOPMOST, x - wndSize / 2, y - wndSize / 2,
+               wndSize, wndSize, SWP_NOACTIVATE | SWP_SHOWWINDOW);
   renderClickAnim(snap);
 }
 void eraseLabel(int i) {

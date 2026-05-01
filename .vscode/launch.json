@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Debug/keycastow_x64.exe",
+            "cwd": "${workspaceFolder}/Debug",
+            "preLaunchTask": "build-debug-x64",
+            "console": "internalConsole"
+        },
+        {
+            "name": "Debug (x86)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Debug/keycastow_x86.exe",
+            "cwd": "${workspaceFolder}/Debug",
+            "preLaunchTask": "build-debug-x86",
+            "console": "internalConsole"
+        }
+    ]
+}
