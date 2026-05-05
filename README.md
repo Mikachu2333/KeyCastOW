@@ -19,7 +19,7 @@ A keystroke and mouse action visualizer for Windows. Shows your keystrokes and m
 
 ## Videos
 
-![example](./example.webp)
+![example](./example.mp4)
 
 ## Build
 

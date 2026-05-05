@@ -19,7 +19,7 @@ Windows 按键与鼠标操作可视化工具。在录屏或演示时将键盘输
 
 ## Videos
 
-![example](./example.webp)
+![example](./example.mp4)
 
 ## 构建
 
