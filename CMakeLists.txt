@@ -43,7 +43,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
-    /W3
+    /W4
+    /permissive-
+    /sdl
     /utf-8
     $<$<CONFIG:Debug>:/Od /Ob0>
     $<$<CONFIG:Release>:/O2 /Oi /GL /Gy>
@@ -58,10 +60,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # ── Linker options ──
 target_link_options(${PROJECT_NAME} PRIVATE
     /DEBUG
+    /DYNAMICBASE
+    /HIGHENTROPYVA
+    /NXCOMPAT
+    /GUARD:CF
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF /OPT:ICF /LTCG>
     # Enable Common Controls v6 visual theming (replaces separate .manifest file)
     "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'"
+    "/MANIFESTUAC:level='asInvoker' uiAccess='false'"
 )
 
 # ── CRT: Debug=/MDd, Release=/MT (matches original vcxproj) ──

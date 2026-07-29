@@ -4,6 +4,8 @@
 
 #include <windows.h>
 
+#include <string>
+
 #include "click_animation.hpp"
 #include "keylog.hpp"
 
@@ -152,7 +154,7 @@ extern BOOL mouseClickAnimation;
 extern BOOL onlyCommandKeys;
 extern WCHAR comboChars[4];
 extern BOOL positioning;
-extern WCHAR deferredLabel[64];
+extern std::wstring deferredLabel;
 HHOOK kbdhook, moshook;
 void showText(LPCWSTR text, int behavior = 0);
 void fadeLastLabel(BOOL whether);
@@ -191,7 +193,7 @@ LPCWSTR GetSymbolFromVK(UINT vk, UINT sc, BOOL mod, HKL hklLayout) {
 LPCWSTR getSpecialKey(UINT vk) {
   static WCHAR unknown[32];
   for (size_t i = 0; i < nSpecialKeys; ++i) {
-    if (specialKeys[i].val == vk) {
+    if (static_cast<UINT>(specialKeys[i].val) == vk) {
       return specialKeys[i].label;
     }
   }
@@ -313,13 +315,13 @@ static ModifierState modifierState = {FALSE, FALSE, FALSE, FALSE, FALSE};
 static BOOL modifierUsed = FALSE;
 static BOOL inAltGrMiddle = FALSE;
 LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
-  KBDLLHOOKSTRUCT k = *(KBDLLHOOKSTRUCT *)lp;
+  if (nCode < 0 || !lp) {
+    return CallNextHookEx(kbdhook, nCode, wp, lp);
+  }
+  const auto &k = *reinterpret_cast<const KBDLLHOOKSTRUCT *>(lp);
   WCHAR c[64] = L"\0";
   WCHAR tmp[64] = L"\0";
   const WCHAR *theKey = NULL;
-
-  if (nCode < 0)
-    return CallNextHookEx(kbdhook, nCode, wp, lp);
 
   static DWORD lastvk = 0;
   GUITHREADINFO Gti;
@@ -433,6 +435,9 @@ LRESULT CALLBACK LLKeyboardProc(int nCode, WPARAM wp, LPARAM lp) {
 }
 
 LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
+  if (nCode < 0 || !lp) {
+    return CallNextHookEx(moshook, nCode, wp, lp);
+  }
   WCHAR c[64] = L"\0";
   WCHAR tmp[64] = L"\0";
 
@@ -443,12 +448,13 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
   static DWORD lastWheelAnimTime = 0;
   static WCHAR lastMouseAction[64] = L"\0";
   BOOL holdButton = FALSE;
-  if (positioning) {
-    MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
-    positionOrigin(idx, ms->pt);
+  if (positioning && nCode == HC_ACTION) {
+    const auto *ms = reinterpret_cast<const MSLLHOOKSTRUCT *>(lp);
+    POINT point = ms->pt;
+    positionOrigin(idx, point);
   } else if ((mouseCapturing || mouseCapturingMod) && idx > 0 &&
              idx < nMouseActions && nCode == HC_ACTION) {
-    MSLLHOOKSTRUCT *ms = reinterpret_cast<MSLLHOOKSTRUCT *>(lp);
+    const auto *ms = reinterpret_cast<const MSLLHOOKSTRUCT *>(lp);
 
     if (!(ms->flags & LLMHF_INJECTED)) {
       int wheelAnimDirection = 0;
@@ -460,7 +466,7 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
 
       // Trigger click animation on mouse events
       if (mouseClickAnimation) {
-        ClickAnimationType animType;
+        ClickAnimationType animType = CLICK_ANIM_LBUTTON;
         BOOL hasAnimation = TRUE;
         if (idx == 1)
           animType = CLICK_ANIM_LBUTTON;
@@ -519,8 +525,8 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
           if (lastClick > 0 &&
               (GetTickCount() - lastClick) <= GetDoubleClickTime()) {
             behavior = 3;
-            // clear deferred label like LButtonDown/RButtonDown/MButtonDown
-            deferredLabel[0] = '\0';
+            // Clear a pending button-down label after the matching click.
+            deferredLabel.clear();
           } else {
             // show it some time later instead of right now
             behavior = 3;
@@ -534,8 +540,8 @@ LRESULT CALLBACK LLMouseProc(int nCode, WPARAM wp, LPARAM lp) {
             lastClick = 0;
           } else {
             behavior = 2;
-            // clear deferred label like LButtonDown/RButtonDown/MButtonDown
-            deferredLabel[0] = '\0';
+            // Clear a pending button-down label after the matching click.
+            deferredLabel.clear();
             if (lastClick > 0) {
               if ((GetTickCount() - lastClick) <= GetDoubleClickTime()) {
                 swprintf(c, 64, mouseDblClicks[(idx - 2) / 3]);

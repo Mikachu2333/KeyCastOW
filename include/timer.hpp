@@ -1,80 +1,104 @@
-/*
-Based on "Simple C++ Timer Wrapper"
-http://www.codeproject.com/Articles/146617/Simple-C-Timer-Wrapper
-by ken.loveday
-
-v1.0 2013 ArmyOfPirates
-*/
-#ifndef _TIMER_H
-#define _TIMER_H
+#pragma once
 
 #include <windows.h>
 
-static void CALLBACK TimerProc(void *, BOOLEAN);
-
-///////////////////////////////////////////////////////////////////////////////
-//
-// class CTimer
-//
+// UI-thread timer wrapper. SetTimer callbacks are dispatched by the window
+// message loop, so GUI/GDI state is never touched from a worker thread.
 class CTimer {
 public:
-  CTimer() {
-    m_hTimer = NULL;
-    m_mutexCount = 0;
-    OnTimedEvent = NULL;
-  }
+  CTimer() = default;
+  ~CTimer() { Stop(); }
 
-  virtual ~CTimer() { Stop(); }
+  CTimer(const CTimer &) = delete;
+  CTimer &operator=(const CTimer &) = delete;
 
-  bool Start(unsigned int interval,    // interval in ms
-             bool immediately = false, // true to call first event immediately
-             bool once = false)        // true to call timed event only once
-  {
-    if (m_hTimer) {
-      Stop();
+  bool Start(unsigned int interval, bool immediately = false,
+             bool once = false) {
+    Stop();
+    interval_ = interval == 0 ? 1 : interval;
+    once_ = once;
+    id_ = SetTimer(nullptr, 0, interval_, TimerProc);
+    if (!id_) {
+      return false;
     }
-
-    SetCount(0);
-
-    BOOL success = CreateTimerQueueTimer(
-        &m_hTimer, NULL, TimerProc, this, immediately ? 0 : interval,
-        once ? 0 : interval, WT_EXECUTEINTIMERTHREAD);
-
-    return (success != 0);
+    if (!Register(id_, this)) {
+      return false;
+    }
+    if (immediately && OnTimedEvent) {
+      OnTimedEvent();
+      if (once_) {
+        Stop();
+      }
+    }
+    return true;
   }
 
   void Stop() {
-    if (m_hTimer) {
-      DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
-      m_hTimer = NULL;
+    if (!id_) {
+      return;
+    }
+    const UINT_PTR oldId = id_;
+    id_ = 0;
+    Unregister(oldId);
+    KillTimer(nullptr, oldId);
+  }
+
+  [[nodiscard]] bool Enabled() const noexcept { return id_ != 0; }
+
+  void (*OnTimedEvent)() = nullptr;
+
+private:
+  struct Entry {
+    UINT_PTR id;
+    CTimer *timer;
+  };
+
+  // Only the message-loop thread accesses this small registry.
+  static inline Entry entries_[8]{};
+
+  static bool Register(UINT_PTR id, CTimer *timer) {
+    for (auto &entry : entries_) {
+      if (!entry.timer) {
+        entry = {id, timer};
+        return true;
+      }
+    }
+    KillTimer(nullptr, id);
+    timer->id_ = 0;
+    return false;
+  }
+
+  static void Unregister(UINT_PTR id) {
+    for (auto &entry : entries_) {
+      if (entry.id == id) {
+        entry = {};
+        return;
+      }
     }
   }
 
-  void (*OnTimedEvent)();
-
-  void SetCount(int value) { InterlockedExchange(&m_mutexCount, value); }
-
-  int GetCount() { return InterlockedExchangeAdd(&m_mutexCount, 0); }
-
-  bool Enabled() { return m_hTimer != NULL; }
-
-private:
-  HANDLE m_hTimer;
-  long m_mutexCount;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-//
-// TimerProc
-//
-static void CALLBACK TimerProc(void *param, BOOLEAN timerCalled) {
-  UNREFERENCED_PARAMETER(timerCalled);
-  CTimer *timer = static_cast<CTimer *>(param);
-  if (!timer || !timer->OnTimedEvent) {
-    return;
+  static CTimer *Find(UINT_PTR id) {
+    for (auto &entry : entries_) {
+      if (entry.id == id) {
+        return entry.timer;
+      }
+    }
+    return nullptr;
   }
-  timer->SetCount(timer->GetCount() + 1);
-  timer->OnTimedEvent();
-};
 
-#endif // _TIMER_H
+  static void CALLBACK TimerProc(HWND, UINT, UINT_PTR id, DWORD) {
+    CTimer *timer = Find(id);
+    if (!timer || !timer->OnTimedEvent) {
+      return;
+    }
+    const bool once = timer->once_;
+    timer->OnTimedEvent();
+    if (once && timer->id_ == id) {
+      timer->Stop();
+    }
+  }
+
+  UINT_PTR id_ = 0;
+  unsigned int interval_ = 0;
+  bool once_ = false;
+};
