@@ -58,10 +58,16 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # ── Linker options ──
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(HIGH_ENTROPY_VA /HIGHENTROPYVA)
+else()
+    set(HIGH_ENTROPY_VA)
+endif()
+
 target_link_options(${PROJECT_NAME} PRIVATE
     /DEBUG
     /DYNAMICBASE
-    /HIGHENTROPYVA
+    ${HIGH_ENTROPY_VA}
     /NXCOMPAT
     /GUARD:CF
     $<$<CONFIG:Debug>:/INCREMENTAL>
