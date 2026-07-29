@@ -281,12 +281,12 @@ void renderClickAnim(ClickAnim &anim) {
     g.FillEllipse(&brush, cx - r, cy - r, r * 2, r * 2);
     break;
   }
-  case CLICK_ANIM_XBUTTON1: {
+  case CLICK_ANIM_XBUTTON2: {
     SolidBrush brush(Color((BYTE)alpha, 255, 180, 50));
     g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, 180, 180);
     break;
   }
-  case CLICK_ANIM_XBUTTON2: {
+  case CLICK_ANIM_XBUTTON1: {
     SolidBrush brush(Color((BYTE)alpha, 255, 180, 50));
     g.FillPie(&brush, cx - r, cy - r, r * 2, r * 2, 0, 180);
     break;
