@@ -1,5 +1,7 @@
 # KeyCastOW
 
+# Will Archive. Please Use [WinSizeP](https://github.com/Mikachu2333/winsize_plus) As An Alternative.
+
 [English](README.md)
 
 Windows 按键与鼠标操作可视化工具。在录屏或演示时将键盘输入和鼠标点击显示在屏幕上。
