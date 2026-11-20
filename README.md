@@ -1,5 +1,7 @@
 # KeyCastOW
 
+# Will Archive. Please Use [WinSizeP](https://github.com/Mikachu2333/winsize_plus) As An Alternative.
+
 [中文说明](./README_zh.md)
 
 A keystroke and mouse action visualizer for Windows. Shows your keystrokes and mouse clicks on screen while recording screencasts or giving presentations.
